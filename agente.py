@@ -7,6 +7,7 @@ e isso se repete até o modelo responder o cliente em texto.
 """
 import json
 import os
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -110,6 +111,12 @@ def montar_prompt():
     )
 
 
+def disse_que_encaminhou(texto):
+    """True se a resposta afirma que o caso foi encaminhado ou cita um protocolo."""
+    # "posso encaminhar?" é só uma oferta e não entra; "encaminhado", "encaminhei" etc. sim
+    return bool(re.search(r"encaminhad|encaminhei|encaminhando|protocolo", texto.lower()))
+
+
 class Agente:
     def __init__(self):
         self.modelo = os.getenv("LLM_MODEL", "emporio-qwen2.5")
@@ -129,6 +136,7 @@ class Agente:
         self.transcricao.append(("Cliente", mensagem))
         self.ultimas_ferramentas = []
         self.cortar_historico()
+        ja_cobrou_ferramenta = False
 
         for _ in range(MAX_PASSOS):
             mensagens = [{"role": "system", "content": montar_prompt()}] + self.historico
@@ -145,6 +153,25 @@ class Agente:
             # sem chamada de ferramenta = o modelo já respondeu o cliente
             if not msg.tool_calls:
                 texto = (msg.content or "").strip()
+
+                # Trava de segurança: nos testes o modelo disse que tinha encaminhado o caso
+                # (e até inventou um protocolo) sem chamar a ferramenta. Se isso acontecer,
+                # peço uma vez para ele chamar a ferramenta de verdade. Se mesmo assim não
+                # chamar, a resposta falsa não chega ao cliente.
+                encaminhou = any(f.startswith("encaminhar_atendente") for f in self.ultimas_ferramentas)
+                if disse_que_encaminhou(texto) and not encaminhou:
+                    if not ja_cobrou_ferramenta:
+                        ja_cobrou_ferramenta = True
+                        self.historico.append({
+                            "role": "user",
+                            "content": "[aviso do sistema] Você ainda não chamou a ferramenta encaminhar_atendente, "
+                                       "então o caso NÃO foi encaminhado. Chame a ferramenta agora com os dados "
+                                       "do cliente. Nunca invente número de protocolo.",
+                        })
+                        continue
+                    texto = ("Não consegui registrar o encaminhamento agora 😕 Você pode falar direto com "
+                             "a nossa equipe pelo WhatsApp (67) 3341-4444.")
+
                 self.historico.append({"role": "assistant", "content": texto})
                 self.transcricao.append(("Allegro", texto))
                 return texto
