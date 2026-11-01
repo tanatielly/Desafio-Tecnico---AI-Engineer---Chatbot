@@ -1,4 +1,4 @@
-# Conversa com o Tom — 25/03/2026 18:05
+# Conversa com o Allegro — 25/03/2026 19:09
 
 Modelo: `emporio-qwen2.5`
 
@@ -6,12 +6,14 @@ Modelo: `emporio-qwen2.5`
 
 > 🔧 `consultar_politicas({"assunto": "loja_contato_e_horario"})`
 
-**Tom:** A loja da Empório da Música está localizada na Rua 14 de Maio, 3200 — Centro, Campo Grande - MS, 79202-333. Sim, abrimos também no sábado, das 09:00 às 13:00.
+**Allegro:** A loja Empório da Música está localizada na Rua 14 de Maio, 3200 — Centro, Campo Grande - MS, 79202-333. 
+
+Eles funcionam de segunda a sexta das 09:00 às 18:00 e aos sábados das 09:00 às 13:00. No momento, a loja está fechada, mas abre no sábado até as 13:00.
 
 **Cliente:** Vocês vendem cordas e amplificador?
 
-**Tom:** Não vendemos cordas, amplificadores ou outros acessórios. Se precisar desses itens, sugiro procurar uma loja especializada. Podemos te ajudar com instrumentos musicais, claro!
+**Allegro:** Desculpe, mas a Empório da Música vende apenas instrumentos musicais. Cordas, palhetas, cabos, cases, pedais e amplificadores não fazem parte do nosso catálogo. Sugiro que você procure uma loja especializada nessas áreas. Tem alguma outra dúvida sobre instrumentos musicais que eu possa ajudar?
 
 **Cliente:** E aí, quem você acha que ganha o Brasileirão esse ano?
 
-**Tom:** Olá! Eu sou o Tom, assistente da Empório da Música. Fico feliz em ajudar com informações sobre instrumentos musicais, mas não tenho informações sobre futebol. Posso te ajudar com algum instrumento musical ou te indicar onde encontrar acessórios?
+**Allegro:** Olá! Posso ajudar com informações sobre instrumentos musicais, mas não faço previsões esportivas. Como estou aqui para te auxiliar na música, qual instrumento você está interessado em comprar ou quer saber mais sobre?

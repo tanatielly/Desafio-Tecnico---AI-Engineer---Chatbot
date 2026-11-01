@@ -3,7 +3,7 @@
 Protótipo de um agente de atendimento por mensagens de texto para a **Empório da Música**,
 loja fictícia de instrumentos musicais em Campo Grande/MS (desafio técnico AI Engineer — Artefact).
 
-O agente se chama **Tom** e atende clientes respondendo sobre produtos, preços, estoque, promoções,
+O agente se chama **Allegro** (o andamento musical "alegre e animado") e atende clientes respondendo sobre produtos, preços, estoque, promoções,
 status de pedidos e políticas da loja (horário, pagamento, trocas, frete, garantia...).
 Ele decide sozinho quando precisa consultar os **dados** (CSVs) e quando precisa consultar as
 **políticas** (PDF), e recusa com educação o que está fora do escopo da loja.
@@ -36,7 +36,7 @@ Ele decide sozinho quando precisa consultar os **dados** (CSVs) e quando precisa
 Cliente ──> main.py (terminal) ou app_streamlit.py (web)
                 │
                 ▼
-            agente.py ──── prompt do Tom + histórico + lista de ferramentas ───> LLM (Ollama ou Groq)
+            agente.py ── prompt do Allegro + histórico + lista de ferramentas ─> LLM (Ollama ou Groq)
                 ▲                                                                    │
                 │                   o LLM pede uma ferramenta (tool call)            │
                 └──── ferramentas.py <───────────────────────────────────────────────┘
@@ -113,7 +113,7 @@ LLM_API_KEY=sua_chave_aqui
 Os pedidos dos CSVs vão só até março/2026, então com a data real todos os prazos já teriam vencido.
 Os exemplos deste repositório foram gerados com essa data.
 
-### 3. Conversar com o Tom
+### 3. Conversar com o Allegro
 
 ```bash
 # terminal
@@ -138,7 +138,7 @@ python main.py < exemplos/roteiros/03_devolucao_pedido.txt
 pytest
 ```
 
-Os testes cobrem as ferramentas (preço, promoção, PIX, parcelamento, verificação do pedido, prazos, extração das políticas). Eles não chamam o LLM.
+Os testes cobrem as ferramentas (preço, promoção, PIX, parcelamento, verificação do pedido, prazos, extração das políticas) e partes do agente que não dependem do LLM (horário da loja e a trava de encaminhamento). Eles não chamam o LLM.
 
 ---
 
@@ -149,11 +149,11 @@ Os testes cobrem as ferramentas (preço, promoção, PIX, parcelamento, verifica
 ├── dados.py                  carrega e trata os CSVs
 ├── politicas.py              lê o PDF e separa por seção
 ├── ferramentas.py            as 4 ferramentas + descrição delas para o LLM
-├── agente.py                 prompt do Tom e o loop de function calling
+├── agente.py                 prompt do Allegro e o loop de function calling
 ├── main.py                   interface de terminal
 ├── app_streamlit.py          interface web
 ├── Modelfile                 qwen2.5:7b com contexto de 8192 tokens (Ollama)
-├── tests/                    testes das ferramentas
+├── tests/                    testes das ferramentas e do agente (sem LLM)
 ├── exemplos/                 conversas de exemplo + roteiros usados para gerar
 ├── .env.example              configuração do modelo
 └── requirements.txt
@@ -193,7 +193,7 @@ Por que não embeddings + banco vetorial:
 
 Se o manual crescer para dezenas de páginas, aí sim vale migrar para RAG vetorial (ver "com mais tempo").
 
-A seção 7 (diretrizes de atendimento) não vira ferramenta: ela é instrução para a equipe, então virou o **prompt de sistema** do Tom.
+A seção 7 (diretrizes de atendimento) não vira ferramenta: ela é instrução para a equipe, então virou o **prompt de sistema** do Allegro.
 
 ### Contas no Python, não no LLM
 
@@ -207,17 +207,17 @@ preço errado em atendimento pode configurar propaganda enganosa (o próprio man
 - **Groq (opcional):** usei o cliente `openai` apontando para a API compatível com OpenAI, que tanto o Ollama quanto o Groq oferecem. Assim a troca de provedor é só no `.env`, sem mudar código. O Groq tem free tier e roda modelos abertos (ex.: Llama 3.3 70B) muito mais rápido.
 - **Testei o Qwen 2.5 3B** para ganhar velocidade, mas ele listou produtos esgotados como disponíveis e ignorou regras do prompt, então fiquei com o 7B.
 - **Contexto:** o padrão do Ollama é 4096 tokens, e só o prompt + ferramentas já usam ~1600. Criei um [Modelfile](Modelfile) com `num_ctx 8192` para a conversa não "empurrar" o prompt de sistema para fora.
-- `temperature=0.2` para respostas mais consistentes.
+- `temperature=0` para respostas mais previsíveis (com 0.2 o modelo às vezes pulava a ferramenta e inventava dados).
 
 ### Estratégia de prompt
 
 O prompt de sistema ([agente.py](agente.py)) é dividido em blocos curtos:
-- **Persona:** Tom, informal mas profissional, "como um amigo que entende de música" (seção 7.1 do manual), respostas curtas no estilo WhatsApp.
+- **Persona:** Allegro, nome tirado do andamento musical que significa "alegre, animado", para combinar com uma loja de instrumentos. Informal mas profissional, "como um amigo que entende de música" (seção 7.1 do manual), respostas curtas no estilo WhatsApp.
 - **Quando usar cada ferramenta:** regra explícita de nunca falar preço/estoque/prazo sem consultar.
 - **Regras de atendimento** tiradas do manual: não prometer promoção que não está ativa, mostrar preço original + % + preço final, PIX não acumula com promoção, sugerir alternativas para produto esgotado.
 - **Escopo:** só instrumentos (acessórios são redirecionados) e recusa gentil de assuntos fora da loja.
 - **Dados corrigidos:** as divergências do manual (ver [Suposições](#suposições)).
-- **Agora:** data/hora atual e se a loja está aberta. Se estiver fechada, o Tom avisa quando a equipe volta (o manual pede isso). O cálculo de aberto/fechado é feito em Python.
+- **Agora:** data/hora atual e se a loja está aberta. Se estiver fechada, o Allegro avisa quando a equipe volta (o manual pede isso). O cálculo de aberto/fechado é feito em Python.
 
 As descrições das ferramentas também fazem parte da estratégia: elas dizem **quando** usar cada uma
 (ex.: "só chame `consultar_pedido` depois que o cliente informar o número E o e-mail ou telefone").
@@ -227,6 +227,10 @@ As descrições das ferramentas também fazem parte da estratégia: elas dizem *
 O agente só mostra dados de um pedido se o cliente informar o **número do pedido e o e-mail ou telefone**
 do cadastro. A verificação é feita no Python (não depende do LLM "obedecer"). A resposta da ferramenta
 traz só o primeiro nome do cliente, sem telefone, e-mail ou cidade.
+
+Também existe uma trava para o agente não **prometer uma ação que não fez**: se ele disser que encaminhou
+o caso para a equipe (ou citar um protocolo) sem ter chamado a ferramenta de encaminhamento, o código
+não deixa essa resposta chegar ao cliente (ver [O que os testes com o modelo mostraram](#o-que-os-testes-com-o-modelo-mostraram)).
 
 ### Interface
 
@@ -319,15 +323,18 @@ uma instrução, mas sempre recebe o que a ferramenta devolve.
 | "Tem promoção de Black Friday?": chamou as promoções "Oferta Especial" e "Desconto Exclusivo" de Black Friday. | Com `apenas_promocao`, a busca devolve os nomes das campanhas ativas e um aviso de que qualquer outra campanha não está ativa. |
 | Produto esgotado: só perguntava se o cliente queria alternativas, sem buscar nenhuma. | Quando o produto procurado está indisponível, a busca já devolve até 3 alternativas da mesma categoria e faixa de preço. |
 | Disse "encaminhando seu caso para a equipe" **sem chamar** a ferramenta de encaminhamento, e não consultou a política de trocas. | O resultado da `consultar_pedido` traz `proximos_passos` (consultar a política de trocas; oferecer encaminhamento se atrasado) e o prompt só permite dizer que encaminhou depois de receber o protocolo. |
+| Depois de trocar o nome do agente de "Tom" para "Allegro" (com uma frase a mais sobre a personalidade), ele respondeu "qual o endereço?" **sem chamar nenhuma ferramenta** e inventou endereço e horário. | Reforcei no prompt que ele não sabe nada da loja de cabeça e precisa chamar a ferramenta antes de responder, encurtei a frase da persona e passei para `temperature=0`. Mostrou como o modelo pequeno é sensível a mudanças pequenas no prompt. |
 
-Os exemplos 3, 4 e 5 foram gerados de novo depois dessas correções.
+| Mesmo com o prompt pedindo, disse "Encaminhando seu caso... o número do protocolo é ANA-26032026-1" **sem chamar a ferramenta**: inventou o protocolo e o caso não foi registrado. | Coloquei uma **trava no código** ([agente.py](agente.py)): se a resposta afirma que encaminhou ou cita um protocolo, mas a ferramenta não foi chamada, o agente pede para o modelo chamar a ferramenta de verdade. Se mesmo assim ele não chamar, o cliente recebe uma resposta honesta com o WhatsApp da loja em vez da promessa falsa. |
+
+Todos os exemplos foram gerados de novo depois dessas correções.
 
 ---
 
 ## Limitações conhecidas
 
 - **Velocidade no Ollama sem GPU:** na minha máquina (Intel Core 7 150U, 16 GB de RAM, sem GPU) cada resposta levou de 1 a 4 minutos, e cada conversa de exemplo (2 ou 3 mensagens) levou de 5 a 10 minutos. Respostas que usam ferramenta fazem duas chamadas ao modelo, e listas longas de produtos demoram mais para gerar. Com GPU ou com o Groq isso deve cair para poucos segundos.
-- **Modelo pequeno ainda erra às vezes:** apesar das correções, o 7B nem sempre segue todas as instruções. No exemplo 3, ele aplica certo o prazo e encaminha o caso, mas não detalha as condições da política de trocas (embalagem original, frete por conta da loja, reembolso em até 10 dias úteis) nem informa o número do protocolo. A parte crítica (preços, estoque, prazos, verificação do pedido) fica no Python justamente para reduzir esse risco. Um modelo maior (ex.: Llama 3.3 70B no Groq) deve seguir melhor o prompt.
+- **Modelo pequeno ainda erra às vezes:** apesar das correções, o 7B nem sempre segue todas as instruções e é sensível a mudanças pequenas no prompt (ver a tabela acima). Com `temperature=0` os 5 roteiros ficaram corretos, mas outras formas de perguntar podem fazer ele pular uma ferramenta. No exemplo 3, ele aplica certo o prazo e encaminha o caso, mas não detalha as condições da política de trocas (embalagem original, frete por conta da loja, reembolso em até 10 dias úteis) nem informa o número do protocolo. A parte crítica (preços, estoque, prazos, verificação do pedido, encaminhamento) fica no Python justamente para reduzir esse risco. Um modelo maior (ex.: Llama 3.3 70B no Groq) deve seguir melhor o prompt.
 - **Groq não testado:** o código usa a mesma API, mas eu só rodei os testes de ponta a ponta com o Ollama.
 - **Verificação do cliente é simples:** número do pedido + e-mail/telefone. Quem souber esses dados de outra pessoa consegue ver o pedido. Num canal real (WhatsApp) o telefone viria do próprio canal.
 - **Dados estáticos:** os CSVs são carregados quando o programa inicia; mudanças nos arquivos só valem depois de reiniciar.
