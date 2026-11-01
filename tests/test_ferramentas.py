@@ -60,6 +60,22 @@ def test_produto_esgotado_e_descontinuado():
     assert buscar_um("Shelby SN-7C")["situacao"].startswith("descontinuado")
 
 
+def test_esgotado_ja_traz_alternativas():
+    resultado = ferramentas.buscar_produtos(texto="Giannini GF-3D")
+    alternativas = resultado["alternativas_disponiveis"]
+
+    assert 0 < len(alternativas) <= 3
+    assert all(p["categoria"] == "Violões" for p in alternativas)
+    assert all(p["situacao"].startswith("disponível") for p in alternativas)
+
+
+def test_promocoes_mostram_campanhas_ativas():
+    resultado = ferramentas.buscar_produtos(apenas_promocao=True)
+    assert resultado["total_disponiveis"] == 4
+    assert resultado["campanhas_ativas"] == ["Desconto Exclusivo", "Oferta Especial"]
+    assert "Black Friday" not in resultado["campanhas_ativas"]
+
+
 def test_descricao_errada_nao_e_enviada():
     # a descrição do "Music Man Bass 1X" fala de um Fender Jazz Bass, então ela é removida
     assert "descricao" not in buscar_um("Music Man Bass 1X")

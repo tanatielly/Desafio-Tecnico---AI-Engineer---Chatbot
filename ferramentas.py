@@ -183,7 +183,38 @@ def buscar_produtos(texto=None, categoria=None, preco_maximo=None, apenas_promoc
         resposta["produtos_indisponiveis"] = [
             {"nome": linha["name"], "situacao": situacao_produto(linha)} for _, linha in indisponiveis.iterrows()
         ]
+
+    # Se o cliente procurou um produto que não está disponível, já mando alternativas.
+    # Testando, o modelo só perguntava se o cliente queria alternativas em vez de buscar.
+    if disponiveis.empty and not indisponiveis.empty:
+        resposta["alternativas_disponiveis"] = buscar_alternativas(indisponiveis.iloc[0])
+
+    # Testando, o modelo chamou "Oferta Especial" de Black Friday, então deixo explícito
+    # quais campanhas estão ativas de verdade.
+    if str(apenas_promocao).lower() == "true":
+        campanhas = sorted(disponiveis["promocao"].dropna().unique())
+        resposta["campanhas_ativas"] = campanhas
+        resposta["aviso_campanhas"] = (
+            f"Só estas campanhas estão ativas agora: {', '.join(campanhas)}. "
+            "Qualquer outra campanha (Black Friday, Aniversário da Loja, Semana do Músico etc.) NÃO está ativa."
+        )
+
     return resposta
+
+
+def buscar_alternativas(produto, quantidade=3):
+    """Produtos disponíveis da mesma categoria e com preço parecido (30% para mais ou para menos)."""
+    preco = produto["price_brl"]
+    parecidos = PRODUTOS[
+        (PRODUTOS["category_id"] == produto["category_id"])
+        & (PRODUTOS["status"] == "active")
+        & (PRODUTOS["stock_quantity"] > 0)
+        & (PRODUTOS["price_brl"].between(preco * 0.7, preco * 1.3))
+    ].copy()
+    # os de preço mais próximo primeiro
+    parecidos["diferenca"] = (parecidos["price_brl"] - preco).abs()
+    parecidos = parecidos.sort_values("diferenca").head(quantidade)
+    return [montar_produto(linha, detalhado=False) for _, linha in parecidos.iterrows()]
 
 
 def consultar_pedido(numero_pedido, email_ou_telefone):
