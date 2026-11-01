@@ -109,7 +109,7 @@ def montar_prompt():
 
 class Agente:
     def __init__(self):
-        self.modelo = os.getenv("LLM_MODEL", "qwen2.5:7b")
+        self.modelo = os.getenv("LLM_MODEL", "emporio-qwen2.5")
         self.cliente = OpenAI(
             base_url=os.getenv("LLM_BASE_URL", "http://localhost:11434/v1"),
             api_key=os.getenv("LLM_API_KEY", "ollama"),  # o Ollama não usa a chave, mas a lib exige uma

@@ -1,0 +1,7 @@
+# Modelo usado pelo agente no Ollama.
+# O contexto padrão do Ollama é 4096 tokens e só o prompt + a descrição das ferramentas
+# já usam uns 1600. Com 8192 cabe uma conversa inteira sem cortar o prompt de sistema.
+#
+# Criar com: ollama create emporio-qwen2.5 -f Modelfile
+FROM qwen2.5:7b
+PARAMETER num_ctx 8192
