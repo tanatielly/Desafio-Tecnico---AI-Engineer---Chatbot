@@ -145,13 +145,14 @@ class Agente:
         self.cortar_historico()
         ja_cobrou_ferramenta = False
         protocolo = None  # preenchido se o caso for encaminhado nesta mensagem
+        ferramentas_da_vez = FERRAMENTAS
 
         for _ in range(MAX_PASSOS):
             mensagens = [{"role": "system", "content": montar_prompt()}] + self.historico
             resposta = self.cliente.chat.completions.create(
                 model=self.modelo,
                 messages=mensagens,
-                tools=FERRAMENTAS,
+                tools=ferramentas_da_vez,
                 # 0 deixa as respostas mais previsíveis. Com 0.2 o modelo às vezes respondia
                 # sem chamar ferramenta e inventava dados (endereço, horário)
                 temperature=0,
@@ -176,6 +177,9 @@ class Agente:
                                        "então o caso NÃO foi encaminhado. Chame a ferramenta agora com os dados "
                                        "do cliente. Nunca invente número de protocolo.",
                         })
+                        # Testando, só o aviso não bastava: com todas as ferramentas na lista o modelo
+                        # continuava inventando o encaminhamento. Deixando só esta, ele chama.
+                        ferramentas_da_vez = [f for f in FERRAMENTAS if f["function"]["name"] == "encaminhar_atendente"]
                         continue
                     texto = ("Não consegui registrar o encaminhamento agora 😕 Você pode falar direto com "
                              "a nossa equipe pelo WhatsApp (67) 3341-4444.")
@@ -210,6 +214,8 @@ class Agente:
                 resultado = executar_ferramenta(nome, argumentos)
                 if nome == "encaminhar_atendente":
                     protocolo = resultado.get("protocolo")
+                    # já encaminhou, então volta a lista completa de ferramentas
+                    ferramentas_da_vez = FERRAMENTAS
 
                 texto_chamada = f"{nome}({json.dumps(argumentos, ensure_ascii=False)})"
                 self.ultimas_ferramentas.append(texto_chamada)
