@@ -320,7 +320,8 @@ def encaminhar_atendente(motivo, nome="", contato=""):
     PASTA_ATENDIMENTOS.mkdir(exist_ok=True)
     arquivo = PASTA_ATENDIMENTOS / "encaminhamentos.csv"
     arquivo_novo = not arquivo.exists()
-    protocolo = datetime.now().strftime("%Y%m%d%H%M%S")
+    # usa hoje() para o protocolo bater com a data da conversa quando DATA_REFERENCIA está definida
+    protocolo = "EM-" + datetime.combine(hoje(), datetime.now().time()).strftime("%Y%m%d-%H%M%S")
 
     with open(arquivo, "a", newline="", encoding="utf-8") as f:
         escritor = csv.writer(f)
@@ -330,7 +331,10 @@ def encaminhar_atendente(motivo, nome="", contato=""):
 
     return {
         "protocolo": protocolo,
-        "mensagem": "Atendimento registrado. A equipe vai entrar em contato em até 24 horas úteis.",
+        "mensagem_para_o_cliente": (
+            f"Seu caso foi encaminhado. Protocolo {protocolo}. "
+            "A equipe vai entrar em contato em até 24 horas úteis."
+        ),
     }
 
 

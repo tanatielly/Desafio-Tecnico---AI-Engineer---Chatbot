@@ -2,6 +2,8 @@
 Testes das ferramentas. Não usam o LLM, então rodam rápido e sem internet.
 Rodar com: pytest
 """
+import re
+
 import ferramentas
 
 
@@ -150,6 +152,19 @@ def test_politica_email_corrigido():
 
 def test_politica_assunto_invalido():
     assert "erro" in ferramentas.consultar_politicas("receita_de_bolo")
+
+
+def test_encaminhar_atendente_gera_protocolo(monkeypatch, tmp_path):
+    # grava numa pasta temporária para não sujar atendimentos/ de verdade
+    monkeypatch.setattr(ferramentas, "PASTA_ATENDIMENTOS", tmp_path)
+    monkeypatch.setenv("DATA_REFERENCIA", "2026-03-25")
+
+    resultado = ferramentas.encaminhar_atendente("pedido 8 atrasado", "Ana", "(67) 99654-7821")
+    protocolo = resultado["protocolo"]
+
+    assert re.fullmatch(r"EM-20260325-\d{6}", protocolo)
+    assert protocolo in resultado["mensagem_para_o_cliente"]
+    assert protocolo in (tmp_path / "encaminhamentos.csv").read_text(encoding="utf-8")
 
 
 def test_ferramenta_inexistente():

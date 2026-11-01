@@ -117,6 +117,13 @@ def disse_que_encaminhou(texto):
     return bool(re.search(r"encaminhad|encaminhei|encaminhando|protocolo", texto.lower()))
 
 
+def garantir_protocolo(texto, protocolo):
+    """Se teve encaminhamento e o modelo esqueceu de citar o protocolo, coloco no final da resposta."""
+    if protocolo and protocolo not in texto:
+        texto += f"\n\nSeu número de protocolo é {protocolo}."
+    return texto
+
+
 class Agente:
     def __init__(self):
         self.modelo = os.getenv("LLM_MODEL", "emporio-qwen2.5")
@@ -137,6 +144,7 @@ class Agente:
         self.ultimas_ferramentas = []
         self.cortar_historico()
         ja_cobrou_ferramenta = False
+        protocolo = None  # preenchido se o caso for encaminhado nesta mensagem
 
         for _ in range(MAX_PASSOS):
             mensagens = [{"role": "system", "content": montar_prompt()}] + self.historico
@@ -172,6 +180,9 @@ class Agente:
                     texto = ("Não consegui registrar o encaminhamento agora 😕 Você pode falar direto com "
                              "a nossa equipe pelo WhatsApp (67) 3341-4444.")
 
+                # o prompt já pede para informar o protocolo, mas o modelo costumava esquecer
+                texto = garantir_protocolo(texto, protocolo)
+
                 self.historico.append({"role": "assistant", "content": texto})
                 self.transcricao.append(("Allegro", texto))
                 return texto
@@ -197,6 +208,8 @@ class Agente:
                     argumentos = {}
 
                 resultado = executar_ferramenta(nome, argumentos)
+                if nome == "encaminhar_atendente":
+                    protocolo = resultado.get("protocolo")
 
                 texto_chamada = f"{nome}({json.dumps(argumentos, ensure_ascii=False)})"
                 self.ultimas_ferramentas.append(texto_chamada)

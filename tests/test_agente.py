@@ -3,7 +3,7 @@ Testes das partes do agente que não dependem do LLM.
 """
 from datetime import datetime
 
-from agente import disse_que_encaminhou, loja_aberta, proxima_abertura
+from agente import disse_que_encaminhou, garantir_protocolo, loja_aberta, proxima_abertura
 
 
 def test_detecta_quando_diz_que_encaminhou():
@@ -12,6 +12,21 @@ def test_detecta_quando_diz_que_encaminhou():
     # oferecer encaminhamento não é afirmar que encaminhou
     assert not disse_que_encaminhou("Quer que eu encaminhe para a equipe?")
     assert not disse_que_encaminhou("Posso encaminhar seu caso, se quiser.")
+
+
+def test_garantir_protocolo():
+    protocolo = "EM-20260325-101500"
+
+    # o modelo esqueceu o protocolo: ele vai para o final da resposta
+    texto = garantir_protocolo("Seu caso foi encaminhado para a equipe.", protocolo)
+    assert texto.endswith(f"Seu número de protocolo é {protocolo}.")
+
+    # já estava na resposta: não repete
+    texto = garantir_protocolo(f"Encaminhado! Protocolo {protocolo}.", protocolo)
+    assert texto.count(protocolo) == 1
+
+    # sem encaminhamento nesta mensagem: não muda nada
+    assert garantir_protocolo("Oi, tudo bem?", None) == "Oi, tudo bem?"
 
 
 def test_horario_da_loja():
