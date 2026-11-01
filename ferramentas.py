@@ -24,7 +24,8 @@ SECOES_POLITICAS = politicas.carregar_secoes()
 PASTA_ATENDIMENTOS = Path(__file__).parent / "atendimentos"
 
 # máximo de produtos devolvidos por busca, para não estourar o contexto do modelo
-LIMITE_RESULTADOS = 15
+# e para a resposta não virar uma lista gigante no chat
+LIMITE_RESULTADOS = 8
 
 STATUS_PEDIDO = {
     "pending": "pendente (pedido recebido, aguardando processamento)",
@@ -134,7 +135,7 @@ def montar_produto(produto, detalhado):
     return item
 
 
-def buscar_produtos(texto=None, categoria=None, preco_maximo=None, apenas_disponiveis=False, apenas_promocao=False):
+def buscar_produtos(texto=None, categoria=None, preco_maximo=None, apenas_promocao=False):
     resultado = PRODUTOS.copy()
     resultado["preco_final"] = resultado["price_brl"] * (1 - resultado["desconto"].fillna(0) / 100)
 
@@ -156,26 +157,32 @@ def buscar_produtos(texto=None, categoria=None, preco_maximo=None, apenas_dispon
         resultado = resultado[resultado["preco_final"] <= float(preco_maximo)]
 
     # o modelo às vezes manda "true" como texto
-    if str(apenas_disponiveis).lower() == "true":
-        resultado = resultado[(resultado["status"] == "active") & (resultado["stock_quantity"] > 0)]
-
     if str(apenas_promocao).lower() == "true":
         resultado = resultado[resultado["desconto"].notna()]
 
     if resultado.empty:
-        return {"total_encontrado": 0, "mensagem": "Nenhum produto encontrado com esses filtros."}
+        return {"mensagem": "Nenhum produto encontrado com esses filtros."}
 
-    # disponíveis primeiro, depois do mais barato para o mais caro
-    resultado["disponivel"] = (resultado["status"] == "active") & (resultado["stock_quantity"] > 0)
-    resultado = resultado.sort_values(["disponivel", "preco_final"], ascending=[False, True])
+    # Separo disponíveis e indisponíveis em listas diferentes. Quando vinha tudo junto,
+    # o modelo às vezes oferecia produto esgotado como se estivesse disponível.
+    tem_estoque = (resultado["status"] == "active") & (resultado["stock_quantity"] > 0)
+    disponiveis = resultado[tem_estoque].sort_values("preco_final")
+    indisponiveis = resultado[~tem_estoque]
 
-    total = len(resultado)
-    detalhado = total <= 3
-    produtos = [montar_produto(linha, detalhado) for _, linha in resultado.head(LIMITE_RESULTADOS).iterrows()]
-
-    resposta = {"total_encontrado": total, "produtos": produtos}
-    if total > LIMITE_RESULTADOS:
-        resposta["aviso"] = f"Mostrando só os {LIMITE_RESULTADOS} primeiros. Peça mais detalhes ao cliente para filtrar."
+    detalhado = len(resultado) <= 3
+    resposta = {
+        "total_disponiveis": len(disponiveis),
+        "produtos_disponiveis": [montar_produto(linha, detalhado) for _, linha in disponiveis.head(LIMITE_RESULTADOS).iterrows()],
+    }
+    if len(disponiveis) > LIMITE_RESULTADOS:
+        resposta["aviso"] = (
+            f"Mostrando só os {LIMITE_RESULTADOS} mais baratos. "
+            "Pergunte ao cliente o que ele prefere (tipo, marca, faixa de preço) para filtrar melhor."
+        )
+    if not indisponiveis.empty:
+        resposta["produtos_indisponiveis"] = [
+            {"nome": linha["name"], "situacao": situacao_produto(linha)} for _, linha in indisponiveis.iterrows()
+        ]
     return resposta
 
 
@@ -318,10 +325,6 @@ FERRAMENTAS = [
                     "preco_maximo": {
                         "type": "number",
                         "description": "Preço máximo em reais, se o cliente mencionar um orçamento.",
-                    },
-                    "apenas_disponiveis": {
-                        "type": "boolean",
-                        "description": "true para trazer só produtos com estoque (use ao sugerir opções de compra).",
                     },
                     "apenas_promocao": {
                         "type": "boolean",
