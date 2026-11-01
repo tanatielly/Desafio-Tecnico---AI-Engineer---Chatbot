@@ -80,6 +80,19 @@ def carregar_secoes():
     return resultado
 
 
+def extrair_subsecao(texto, numero):
+    """Pega só uma subseção (ex: "4.1") de dentro do texto de uma seção."""
+    linhas = []
+    dentro = False
+    for linha in texto.splitlines():
+        # títulos de subseção começam com "4.1 ", "4.2 "...; as linhas quebradas do PDF não
+        if re.match(r"^\d+\.\d+ ", linha):
+            dentro = linha.startswith(numero + " ")
+        if dentro:
+            linhas.append(linha)
+    return "\n".join(linhas)
+
+
 if __name__ == "__main__":
     # para conferir rápido se a extração ficou boa: python politicas.py
     for assunto, texto in carregar_secoes().items():

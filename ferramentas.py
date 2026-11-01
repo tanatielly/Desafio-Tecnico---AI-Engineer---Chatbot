@@ -20,6 +20,9 @@ PRODUTOS = dados.carregar_produtos()
 PEDIDOS, ITENS, CLIENTES = dados.carregar_pedidos()
 CATEGORIAS = dados.listar_categorias()
 SECOES_POLITICAS = politicas.carregar_secoes()
+# regras de devolução que vão junto com o pedido (seções 4.1 e 4.2 do manual)
+REGRAS_ARREPENDIMENTO = politicas.extrair_subsecao(SECOES_POLITICAS["trocas_e_devolucoes"], "4.1")
+REGRAS_DEFEITO = politicas.extrair_subsecao(SECOES_POLITICAS["trocas_e_devolucoes"], "4.2")
 
 PASTA_ATENDIMENTOS = Path(__file__).parent / "atendimentos"
 
@@ -283,12 +286,22 @@ def consultar_pedido(numero_pedido, email_ou_telefone):
                 "garantia legal (90 dias após receber)": "dentro do prazo" if dias_recebido <= 90 else "fora do prazo",
             }
 
-    # Dica para o modelo. Testando, ele esquecia de consultar a política de trocas
-    # e chegou a dizer que tinha encaminhado o caso sem chamar a ferramenta.
-    resposta["proximos_passos"] = (
-        "Se o cliente quiser trocar, devolver ou desistir, chame consultar_politicas com o assunto "
-        "trocas_e_devolucoes e explique as condições."
-    )
+    # Testando, o modelo não chamava a política de trocas depois de consultar o pedido,
+    # então as regras de devolução que valem para o pedido já vão junto aqui.
+    if pedido["status"] in ("shipped", "delivered"):
+        resposta["condicoes_de_devolucao"] = REGRAS_ARREPENDIMENTO
+        if pedido["status"] == "delivered":
+            resposta["troca_por_defeito"] = REGRAS_DEFEITO
+        resposta["proximos_passos"] = (
+            "Se o cliente quiser desistir ou devolver, explique TODAS as condições de 'condicoes_de_devolucao' "
+            f"(o reembolso volta para: {resposta['forma_de_pagamento']})."
+        )
+    else:
+        resposta["proximos_passos"] = (
+            "Se o cliente quiser trocar ou devolver, chame consultar_politicas com o assunto "
+            "trocas_e_devolucoes e explique as condições."
+        )
+
     if "atrasado" in resposta:
         resposta["proximos_passos"] += " O pedido está atrasado: ofereça encaminhar para a equipe com encaminhar_atendente."
 

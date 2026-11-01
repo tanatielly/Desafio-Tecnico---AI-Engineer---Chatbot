@@ -109,6 +109,33 @@ def test_prazos_pedido_entregue(monkeypatch):
     assert resultado["prazos"]["arrependimento (7 dias após receber)"] == "fora do prazo"
 
 
+def test_extrai_subsecao_de_arrependimento():
+    texto = ferramentas.REGRAS_ARREPENDIMENTO
+    assert texto.startswith("4.1 Direito de Arrependimento")
+    assert "10 dias úteis" in texto
+    assert "frete de devolução" in texto
+    assert "4.2" not in texto  # não pode vazar a subseção seguinte
+
+
+def test_pedido_enviado_traz_condicoes_de_devolucao(monkeypatch):
+    monkeypatch.setenv("DATA_REFERENCIA", "2026-03-25")
+    resultado = ferramentas.consultar_pedido(8, "anacarol.ferreira@coldmail.com")
+
+    assert "embalagem original" in resultado["condicoes_de_devolucao"]
+    # o reembolso volta para a forma de pagamento do pedido
+    assert "cartão de débito" in resultado["proximos_passos"]
+    # ainda não recebeu, então não faz sentido falar de defeito
+    assert "troca_por_defeito" not in resultado
+
+
+def test_pedido_entregue_traz_troca_por_defeito(monkeypatch):
+    monkeypatch.setenv("DATA_REFERENCIA", "2026-03-25")
+    resultado = ferramentas.consultar_pedido(1, "pedro.oliveira@jmail.com")
+
+    assert "condicoes_de_devolucao" in resultado
+    assert "30 (trinta) dias" in resultado["troca_por_defeito"]
+
+
 def test_politica_loja_traz_endereco_e_horario():
     texto = ferramentas.consultar_politicas("loja_contato_e_horario")["texto"]
     assert "Rua 14 de Maio, 3200" in texto
