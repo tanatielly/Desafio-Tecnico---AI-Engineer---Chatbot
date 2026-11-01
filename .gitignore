@@ -1,0 +1,17 @@
+# ambiente
+.venv/
+venv/
+.env
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# arquivos gerados pelo agente durante o uso
+conversas/
+atendimentos/
+
+# editor
+.vscode/
+.idea/
