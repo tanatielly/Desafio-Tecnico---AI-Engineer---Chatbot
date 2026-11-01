@@ -215,7 +215,6 @@ def consultar_pedido(numero_pedido, email_ou_telefone):
         "numero_pedido": numero,
         "primeiro_nome_cliente": cliente["name"].split()[0],
         "data_do_pedido": formatar_data(pedido["order_date"]),
-        "dias_desde_o_pedido": (hoje() - date.fromisoformat(pedido["order_date"])).days,
         "status": STATUS_PEDIDO.get(pedido["status"], pedido["status"]),
         "itens": [f"{linha.quantity}x {linha.name}" for linha in itens.itertuples()],
         "total": formatar_reais(pedido["total_brl"]),
@@ -234,12 +233,18 @@ def consultar_pedido(numero_pedido, email_ou_telefone):
         if pedido["status"] == "shipped":
             if previsao < hoje():
                 resposta["atrasado"] = f"sim, a previsão de entrega passou há {(hoje() - previsao).days} dias"
-            resposta["prazos"] = "o prazo de 7 dias para desistir da compra começa a contar quando o cliente receber"
+            # Escrevo bem explícito porque, testando, o modelo entendeu que o prazo já tinha acabado
+            resposta["prazos"] = {
+                "arrependimento (7 dias após receber)": (
+                    "AINDA NÃO COMEÇOU: o cliente ainda não recebeu o produto. "
+                    "Ele pode desistir da compra em até 7 dias depois que receber."
+                ),
+            }
 
         if pedido["status"] == "delivered":
             # não temos a data real de recebimento, então uso a previsão de entrega como aproximação
             dias_recebido = (hoje() - previsao).days
-            dias_compra = resposta["dias_desde_o_pedido"]
+            dias_compra = (hoje() - date.fromisoformat(pedido["order_date"])).days
             resposta["dias_desde_o_recebimento_aprox"] = dias_recebido
             resposta["prazos"] = {
                 "arrependimento (7 dias após receber)": "dentro do prazo" if dias_recebido <= 7 else "fora do prazo",

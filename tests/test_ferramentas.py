@@ -79,6 +79,8 @@ def test_pedido_enviado_e_atrasado(monkeypatch):
     assert resultado["status"].startswith("enviado")
     assert resultado["codigo_rastreio"] == "BRJL5544332BR"
     assert "atrasado" in resultado
+    # como ainda não chegou, o prazo de arrependimento nem começou
+    assert "AINDA NÃO COMEÇOU" in resultado["prazos"]["arrependimento (7 dias após receber)"]
 
 
 def test_prazos_pedido_entregue(monkeypatch):
