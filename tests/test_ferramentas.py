@@ -93,14 +93,20 @@ def test_prazos_pedido_entregue(monkeypatch):
     assert resultado["prazos"]["arrependimento (7 dias após receber)"] == "fora do prazo"
 
 
-def test_politica_horario():
-    texto = ferramentas.consultar_politicas("horario")["texto"]
+def test_politica_loja_traz_endereco_e_horario():
+    texto = ferramentas.consultar_politicas("loja_contato_e_horario")["texto"]
+    assert "Rua 14 de Maio, 3200" in texto
     assert "09:00 às 18:00" in texto
+    assert "Sábado | 09:00 às 13:00" in texto
 
 
 def test_politica_email_corrigido():
-    texto = ferramentas.consultar_politicas("loja_e_contato")["texto"]
+    texto = ferramentas.consultar_politicas("loja_contato_e_horario")["texto"]
     assert "contato@emporiodamusica.com.br" in texto
+
+
+def test_politica_assunto_invalido():
+    assert "erro" in ferramentas.consultar_politicas("receita_de_bolo")
 
 
 def test_ferramenta_inexistente():

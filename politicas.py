@@ -12,18 +12,19 @@ from pypdf import PdfReader
 
 ARQUIVO_PDF = Path(__file__).parent / "data" / "políticas_da_loja.pdf"
 
-# número da seção no manual -> nome do assunto usado pela ferramenta.
+# assunto usado pela ferramenta -> seções do manual que entram nele.
+# "Sobre a loja" e "horário" ficaram juntos porque o cliente costuma perguntar os dois na mesma
+# mensagem e, testando, o modelo consultava só um deles e inventava o outro.
 # A seção 7 (diretrizes de atendimento) é instrução interna para a equipe, então ela
 # vai para o prompt do agente e não para o cliente. A seção 10 é só encerramento.
 ASSUNTOS = {
-    1: "loja_e_contato",
-    2: "horario",
-    3: "pagamento",
-    4: "trocas_e_devolucoes",
-    5: "frete_e_entrega",
-    6: "promocoes",
-    8: "garantia",
-    9: "privacidade",
+    "loja_contato_e_horario": [1, 2],
+    "pagamento": [3],
+    "trocas_e_devolucoes": [4],
+    "frete_e_entrega": [5],
+    "promocoes": [6],
+    "garantia": [8],
+    "privacidade": [9],
 }
 
 
@@ -62,8 +63,11 @@ def carregar_secoes():
             secoes[numero_atual].append(linha)
 
     resultado = {}
-    for numero, assunto in ASSUNTOS.items():
-        texto = "\n".join(secoes.get(numero, []))
+    for assunto, numeros in ASSUNTOS.items():
+        linhas = []
+        for numero in numeros:
+            linhas += secoes.get(numero, [])
+        texto = "\n".join(linhas)
         # o e-mail na tabela do manual está com acento ("empóriodamusica"), o que não é um e-mail válido.
         # Uso a versão da capa do manual.
         texto = texto.replace("empóriodamusica", "emporiodamusica")
