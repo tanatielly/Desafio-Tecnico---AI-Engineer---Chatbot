@@ -56,9 +56,9 @@ Cliente ──> main.py (terminal) ou app_streamlit.py (web)
 | Ferramenta | Quando o agente usa | O que faz |
 |---|---|---|
 | `buscar_produtos` | preço, estoque, disponibilidade, promoções | Filtra o catálogo por texto, categoria, preço máximo e promoção. Já devolve preço promocional, preço no PIX e parcelamento calculados. Separa produtos disponíveis dos esgotados/descontinuados e, se o produto procurado estiver indisponível, já sugere alternativas parecidas. |
-| `consultar_pedido` | status, rastreio, prazos de um pedido | Só mostra o pedido se o e-mail ou telefone informado for do dono do pedido (LGPD). Calcula se está atrasado e se está dentro dos prazos de arrependimento/troca/garantia. |
+| `consultar_pedido` | status, rastreio, prazos de um pedido | Só mostra o pedido se o e-mail ou telefone informado for do dono do pedido (LGPD). Calcula se está atrasado e se está dentro dos prazos de arrependimento/troca/garantia, e já traz as regras de devolução do manual que valem para o pedido. |
 | `consultar_politicas` | endereço, horário, pagamento, trocas, frete, promoções, garantia, privacidade | Recebe um assunto (`loja_contato_e_horario`, `pagamento`, `trocas_e_devolucoes`, `frete_e_entrega`, `promocoes`, `garantia`, `privacidade`) e devolve o texto da seção do manual. |
-| `encaminhar_atendente` | reclamação, atraso, cliente pedindo um humano | Registra o caso em `atendimentos/encaminhamentos.csv` e devolve um protocolo. |
+| `encaminhar_atendente` | reclamação, atraso, cliente pedindo um humano | Registra o caso em `atendimentos/encaminhamentos.csv` e devolve um protocolo (`EM-AAAAMMDD-HHMMSS`), que sempre aparece na resposta ao cliente. |
 
 ---
 
@@ -138,7 +138,7 @@ python main.py < exemplos/roteiros/03_devolucao_pedido.txt
 pytest
 ```
 
-Os testes cobrem as ferramentas (preço, promoção, PIX, parcelamento, verificação do pedido, prazos, extração das políticas) e partes do agente que não dependem do LLM (horário da loja e a trava de encaminhamento). Eles não chamam o LLM.
+Os testes cobrem as ferramentas (preço, promoção, PIX, parcelamento, verificação do pedido, prazos, regras de devolução, protocolo, extração das políticas) e partes do agente (horário da loja, protocolo e a trava de encaminhamento, usando um cliente falso no lugar do LLM). Nenhum teste chama o LLM de verdade.
 
 ---
 
@@ -305,7 +305,7 @@ As linhas com 🔧 mostram as ferramentas que o agente chamou. Os roteiros usado
 |---|---|---|
 | 1 | [Violões até R$ 1000](exemplos/01_catalogo.md) | Busca com filtro de categoria e preço, só com itens disponíveis, e recomendação para iniciante usando o histórico da conversa. |
 | 2 | [Preço do Takamine GD20](exemplos/02_preco_e_pagamento.md) | Preço, preço no PIX e parcelamento calculados pela ferramenta. |
-| 3 | [Devolução de pedido atrasado](exemplos/03_devolucao_pedido.md) — **não trivial** | Pede número do pedido + e-mail antes de consultar (LGPD), consulta o pedido em tempo real, aplica a regra de arrependimento a um pedido que ainda não chegou e encaminha o atraso para a equipe (registro em `atendimentos/encaminhamentos.csv`). |
+| 3 | [Devolução de pedido atrasado](exemplos/03_devolucao_pedido.md) — **não trivial** | Pede número do pedido + e-mail antes de consultar (LGPD), consulta o pedido em tempo real, aplica a regra de arrependimento a um pedido que ainda não chegou, explica as condições de devolução (embalagem, reembolso no cartão de débito em até 10 dias úteis) e encaminha o atraso para a equipe com protocolo (registro em `atendimentos/encaminhamentos.csv`). |
 | 4 | [Endereço, horário e fora do escopo](exemplos/04_loja_e_fora_do_escopo.md) | Consulta às políticas, recusa educada de acessórios e de assunto que não tem a ver com a loja. |
 | 5 | [Black Friday e produto esgotado](exemplos/05_promocao_e_esgotado.md) — **não trivial** | Não promete campanha que não está ativa, mostra as promoções reais (preço original, % e preço final) e sugere alternativas para um produto esgotado. |
 
@@ -325,16 +325,18 @@ uma instrução, mas sempre recebe o que a ferramenta devolve.
 | Disse "encaminhando seu caso para a equipe" **sem chamar** a ferramenta de encaminhamento, e não consultou a política de trocas. | O resultado da `consultar_pedido` traz `proximos_passos` (consultar a política de trocas; oferecer encaminhamento se atrasado) e o prompt só permite dizer que encaminhou depois de receber o protocolo. |
 | Depois de trocar o nome do agente de "Tom" para "Allegro" (com uma frase a mais sobre a personalidade), ele respondeu "qual o endereço?" **sem chamar nenhuma ferramenta** e inventou endereço e horário. | Reforcei no prompt que ele não sabe nada da loja de cabeça e precisa chamar a ferramenta antes de responder, encurtei a frase da persona e passei para `temperature=0`. Mostrou como o modelo pequeno é sensível a mudanças pequenas no prompt. |
 
-| Mesmo com o prompt pedindo, disse "Encaminhando seu caso... o número do protocolo é ANA-26032026-1" **sem chamar a ferramenta**: inventou o protocolo e o caso não foi registrado. | Coloquei uma **trava no código** ([agente.py](agente.py)): se a resposta afirma que encaminhou ou cita um protocolo, mas a ferramenta não foi chamada, o agente pede para o modelo chamar a ferramenta de verdade. Se mesmo assim ele não chamar, o cliente recebe uma resposta honesta com o WhatsApp da loja em vez da promessa falsa. |
+| Mesmo com o prompt pedindo, disse "Encaminhando seu caso... o número do protocolo é ANA-26032026-1" **sem chamar a ferramenta**: inventou o protocolo e o caso não foi registrado. | Coloquei uma **trava no código** ([agente.py](agente.py)): se a resposta afirma que encaminhou ou cita um protocolo, mas a ferramenta não foi chamada, o agente pede de novo ao modelo oferecendo **só a ferramenta de encaminhamento** (só o aviso não bastava: com as 4 ferramentas na lista ele continuava inventando). Se mesmo assim ele não chamar, o cliente recebe uma resposta honesta com o WhatsApp da loja em vez da promessa falsa. Esse fluxo tem teste com um cliente falso, sem LLM. |
 
-Todos os exemplos foram gerados de novo depois dessas correções.
+| Explicava o prazo de devolução, mas **não detalhava as condições** (embalagem original, frete por conta da loja, reembolso em até 10 dias úteis), porque não fazia a segunda chamada para a política de trocas. E **não informava o número do protocolo** do encaminhamento, mesmo com o prompt pedindo. | A `consultar_pedido` passou a devolver as regras de devolução do manual (seção 4.1, e 4.2 para pedido entregue) e para qual forma de pagamento o reembolso volta, sem precisar de outra chamada. O protocolo é garantido no código: se o caso foi encaminhado e o número não está na resposta, ele é acrescentado no final. |
+
+Os exemplos foram gerados de novo depois dessas correções. A última correção não mexeu no prompt e só afeta conversas sobre pedidos e encaminhamento, então só o exemplo 3 precisou ser gerado de novo.
 
 ---
 
 ## Limitações conhecidas
 
 - **Velocidade no Ollama sem GPU:** na minha máquina (Intel Core 7 150U, 16 GB de RAM, sem GPU) cada resposta levou de 1 a 4 minutos, e cada conversa de exemplo (2 ou 3 mensagens) levou de 5 a 10 minutos. Respostas que usam ferramenta fazem duas chamadas ao modelo, e listas longas de produtos demoram mais para gerar. Com GPU ou com o Groq isso deve cair para poucos segundos.
-- **Modelo pequeno ainda erra às vezes:** apesar das correções, o 7B nem sempre segue todas as instruções e é sensível a mudanças pequenas no prompt (ver a tabela acima). Com `temperature=0` os 5 roteiros ficaram corretos, mas outras formas de perguntar podem fazer ele pular uma ferramenta. No exemplo 3, ele aplica certo o prazo e encaminha o caso, mas não detalha as condições da política de trocas (embalagem original, frete por conta da loja, reembolso em até 10 dias úteis) nem informa o número do protocolo. A parte crítica (preços, estoque, prazos, verificação do pedido, encaminhamento) fica no Python justamente para reduzir esse risco. Um modelo maior (ex.: Llama 3.3 70B no Groq) deve seguir melhor o prompt.
+- **Modelo pequeno ainda erra às vezes:** apesar das correções, o 7B nem sempre segue todas as instruções e é sensível a mudanças pequenas no prompt (ver a tabela acima). Com `temperature=0` os 5 roteiros ficaram corretos, mas outras formas de perguntar podem fazer ele pular uma ferramenta. No exemplo 3, ele explica a embalagem e o reembolso, mas não menciona que o frete de devolução é por conta da loja, mesmo com a regra vindo no resultado da ferramenta. A parte crítica (preços, estoque, prazos, verificação do pedido, encaminhamento) fica no Python justamente para reduzir esse risco. Um modelo maior (ex.: Llama 3.3 70B no Groq) deve seguir melhor o prompt.
 - **Groq não testado:** o código usa a mesma API, mas eu só rodei os testes de ponta a ponta com o Ollama.
 - **Verificação do cliente é simples:** número do pedido + e-mail/telefone. Quem souber esses dados de outra pessoa consegue ver o pedido. Num canal real (WhatsApp) o telefone viria do próprio canal.
 - **Dados estáticos:** os CSVs são carregados quando o programa inicia; mudanças nos arquivos só valem depois de reiniciar.
