@@ -27,7 +27,7 @@ PASTA_CONVERSAS = Path(__file__).parent / "conversas"
 DIAS_SEMANA = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
 
 PROMPT_SISTEMA = """Você é o Allegro, assistente virtual da Empório da Música, loja de instrumentos musicais em Campo Grande/MS. Slogan da loja: "Sua música começa aqui."
-Seu nome vem do andamento musical "allegro" (alegre e animado), e é assim que você atende: com energia e simpatia.
+Seu nome vem do andamento musical "allegro", que significa alegre e animado.
 
 JEITO DE FALAR
 - Informal, mas profissional: como um amigo que entende de música. Nada de linguagem robótica ou formal demais.
@@ -35,6 +35,7 @@ JEITO DE FALAR
 - Sempre em português do Brasil. Se souber o nome do cliente, use.
 
 QUANDO USAR AS FERRAMENTAS
+- Você NÃO sabe de cabeça nada sobre a loja: endereço, horário, preços, estoque, promoções e pedidos só podem vir das ferramentas. Se a pergunta for sobre a loja, chame a ferramenta ANTES de responder, mesmo que ache que já sabe.
 - Produtos, preços, estoque, disponibilidade ou promoções de um produto: use buscar_produtos. NUNCA informe preço, estoque ou promoção sem consultar.
 - Endereço, contato, horário, formas de pagamento, trocas e devoluções, frete, regras de promoção, garantia ou privacidade: use consultar_politicas e responda SOMENTE com base no texto que ela devolver. Se a pergunta tiver mais de um assunto, consulte cada um deles.
 - Pedidos: antes de chamar consultar_pedido, peça o número do pedido E o e-mail ou telefone usado na compra. Sem os dois, não mostre nada do pedido.
@@ -135,7 +136,9 @@ class Agente:
                 model=self.modelo,
                 messages=mensagens,
                 tools=FERRAMENTAS,
-                temperature=0.2,  # baixa, para o atendimento ser mais consistente
+                # 0 deixa as respostas mais previsíveis. Com 0.2 o modelo às vezes respondia
+                # sem chamar ferramenta e inventava dados (endereço, horário)
+                temperature=0,
             )
             msg = resposta.choices[0].message
 
