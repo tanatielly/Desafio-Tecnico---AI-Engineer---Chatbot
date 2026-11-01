@@ -283,6 +283,15 @@ def consultar_pedido(numero_pedido, email_ou_telefone):
                 "garantia legal (90 dias após receber)": "dentro do prazo" if dias_recebido <= 90 else "fora do prazo",
             }
 
+    # Dica para o modelo. Testando, ele esquecia de consultar a política de trocas
+    # e chegou a dizer que tinha encaminhado o caso sem chamar a ferramenta.
+    resposta["proximos_passos"] = (
+        "Se o cliente quiser trocar, devolver ou desistir, chame consultar_politicas com o assunto "
+        "trocas_e_devolucoes e explique as condições."
+    )
+    if "atrasado" in resposta:
+        resposta["proximos_passos"] += " O pedido está atrasado: ofereça encaminhar para a equipe com encaminhar_atendente."
+
     return resposta
 
 
