@@ -1,5 +1,5 @@
 """
-Conversa com o Tom pelo terminal.
+Conversa com o Allegro pelo terminal.
 
 Uso:
     python main.py
@@ -23,7 +23,7 @@ def main():
 
     print("=" * 60)
     print("Empório da Música - Sua música começa aqui.")
-    print(f"Atendimento virtual com o Tom (modelo: {agente.modelo})")
+    print(f"Atendimento virtual com o Allegro (modelo: {agente.modelo})")
     print('Digite "sair" para encerrar ou "limpar" para começar de novo.')
     print("=" * 60)
 
@@ -57,7 +57,7 @@ def main():
 
         for chamada in agente.ultimas_ferramentas:
             print(f"  [ferramenta] {chamada}")
-        print(f"\nTom: {resposta}")
+        print(f"\nAllegro: {resposta}")
 
     arquivo = agente.salvar_conversa()
     if arquivo:

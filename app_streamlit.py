@@ -1,5 +1,5 @@
 """
-Interface web simples para conversar com o Tom.
+Interface web simples para conversar com o Allegro.
 
 Uso: streamlit run app_streamlit.py
 """
@@ -9,7 +9,7 @@ from agente import Agente
 
 st.set_page_config(page_title="Empório da Música", page_icon="🎸")
 st.title("🎸 Empório da Música")
-st.caption("Sua música começa aqui. Converse com o Tom, nosso assistente virtual.")
+st.caption("Sua música começa aqui. Converse com o Allegro, nosso assistente virtual.")
 
 # O Streamlit roda o arquivo todo de novo a cada interação,
 # então o agente e as mensagens ficam guardados no session_state.
@@ -36,7 +36,7 @@ with st.sidebar:
         st.rerun()
 
 with st.chat_message("assistant"):
-    mostrar_texto("Oi! Eu sou o Tom, da Empório da Música 🎶 Posso te ajudar com instrumentos, preços, pedidos ou dúvidas sobre a loja.")
+    mostrar_texto("Oi! Eu sou o Allegro, da Empório da Música 🎶 Posso te ajudar com instrumentos, preços, pedidos ou dúvidas sobre a loja.")
 
 for papel, texto, ferramentas in st.session_state.mensagens:
     with st.chat_message(papel):
@@ -51,7 +51,7 @@ if pergunta:
         mostrar_texto(pergunta)
 
     with st.chat_message("assistant"):
-        with st.spinner("Tom está digitando..."):
+        with st.spinner("Allegro está digitando..."):
             try:
                 resposta = agente.responder(pergunta)
             except Exception as erro:

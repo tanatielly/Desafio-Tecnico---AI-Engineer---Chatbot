@@ -26,7 +26,8 @@ PASTA_CONVERSAS = Path(__file__).parent / "conversas"
 
 DIAS_SEMANA = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
 
-PROMPT_SISTEMA = """Você é o Tom, assistente virtual da Empório da Música, loja de instrumentos musicais em Campo Grande/MS. Slogan da loja: "Sua música começa aqui."
+PROMPT_SISTEMA = """Você é o Allegro, assistente virtual da Empório da Música, loja de instrumentos musicais em Campo Grande/MS. Slogan da loja: "Sua música começa aqui."
+Seu nome vem do andamento musical "allegro" (alegre e animado), e é assim que você atende: com energia e simpatia.
 
 JEITO DE FALAR
 - Informal, mas profissional: como um amigo que entende de música. Nada de linguagem robótica ou formal demais.
@@ -142,7 +143,7 @@ class Agente:
             if not msg.tool_calls:
                 texto = (msg.content or "").strip()
                 self.historico.append({"role": "assistant", "content": texto})
-                self.transcricao.append(("Tom", texto))
+                self.transcricao.append(("Allegro", texto))
                 return texto
 
             self.historico.append({
@@ -179,7 +180,7 @@ class Agente:
 
         texto = "Desculpa, me enrolei aqui para encontrar essa informação. Pode reformular a pergunta?"
         self.historico.append({"role": "assistant", "content": texto})
-        self.transcricao.append(("Tom", texto))
+        self.transcricao.append(("Allegro", texto))
         return texto
 
     def cortar_historico(self):
@@ -204,7 +205,7 @@ class Agente:
         if arquivo is None:
             arquivo = PASTA_CONVERSAS / f"conversa_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.md"
 
-        linhas = [f"# Conversa com o Tom — {agora().strftime('%d/%m/%Y %H:%M')}", "", f"Modelo: `{self.modelo}`", ""]
+        linhas = [f"# Conversa com o Allegro — {agora().strftime('%d/%m/%Y %H:%M')}", "", f"Modelo: `{self.modelo}`", ""]
         for papel, texto in self.transcricao:
             if papel == "ferramenta":
                 linhas.append(f"> 🔧 `{texto}`")
