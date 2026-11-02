@@ -118,9 +118,12 @@ def montar_prompt():
 
 
 def disse_que_encaminhou(texto):
-    """True se a resposta afirma que o caso foi encaminhado ou cita um protocolo."""
-    # "posso encaminhar?" é só uma oferta e não entra; "encaminhado", "encaminhei" etc. sim
-    return bool(re.search(r"encaminhad|encaminhei|encaminhando|protocolo", texto.lower()))
+    """True se a resposta afirma que o caso JÁ foi encaminhado ou informa um número de protocolo."""
+    # Ofertas como "posso encaminhar?" ou "seu caso será encaminhado" não contam: testando, a trava
+    # disparava nelas e jogava fora uma resposta boa. Protocolo só conta se vier com um número
+    # (4 dígitos ou mais), para "você recebe o protocolo em até 24 horas" não contar.
+    padrao = r"foi encaminhad|foram encaminhad|est[aá] encaminhad|encaminhei|encaminhando|protocolo[^.\n]{0,25}\d{4,}"
+    return bool(re.search(padrao, texto.lower()))
 
 
 def garantir_protocolo(texto, protocolo):

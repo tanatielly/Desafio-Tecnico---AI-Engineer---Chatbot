@@ -49,7 +49,7 @@ def criar_agente(monkeypatch, tmp_path, respostas):
 
 def test_trava_faz_o_modelo_chamar_a_ferramenta_de_verdade(monkeypatch, tmp_path):
     agente = criar_agente(monkeypatch, tmp_path, [
-        resposta_texto("Encaminhei seu caso! Protocolo ANA-123."),  # inventou o encaminhamento
+        resposta_texto("Encaminhei seu caso! Protocolo ANA-26032026-1."),  # inventou o encaminhamento
         resposta_ferramenta("encaminhar_atendente", {"motivo": "pedido atrasado", "contato": "67 99654-7821"}),
         resposta_texto("Pronto, seu caso foi encaminhado!"),  # esqueceu o protocolo
     ])
@@ -58,7 +58,7 @@ def test_trava_faz_o_modelo_chamar_a_ferramenta_de_verdade(monkeypatch, tmp_path
     # na segunda tentativa só a ferramenta de encaminhar é oferecida ao modelo
     assert agente.cliente.ferramentas_recebidas[1] == ["encaminhar_atendente"]
     # o protocolo inventado não aparece; o verdadeiro é acrescentado no final
-    assert "ANA-123" not in texto
+    assert "ANA-26032026-1" not in texto
     assert re.search(r"EM-\d{8}-\d{6}", texto)
     assert (tmp_path / "encaminhamentos.csv").exists()
 
@@ -96,22 +96,27 @@ def test_resposta_que_vaza_o_prompt_e_trocada(monkeypatch, tmp_path):
 
 def test_trava_nao_deixa_promessa_falsa_chegar_ao_cliente(monkeypatch, tmp_path):
     agente = criar_agente(monkeypatch, tmp_path, [
-        resposta_texto("Encaminhado! Protocolo X-1."),
-        resposta_texto("Encaminhei sim, protocolo X-2."),  # mesmo depois do aviso não chamou
+        resposta_texto("Seu caso foi encaminhado! Protocolo X-1001."),
+        resposta_texto("Encaminhei sim, protocolo X-1002."),  # mesmo depois do aviso não chamou
     ])
     texto = agente.responder("Encaminha pra equipe, por favor")
 
     assert "WhatsApp" in texto
-    assert "X-1" not in texto and "X-2" not in texto
+    assert "X-1001" not in texto and "X-1002" not in texto
     assert not (tmp_path / "encaminhamentos.csv").exists()
 
 
 def test_detecta_quando_diz_que_encaminhou():
     assert disse_que_encaminhou("Seu caso foi encaminhado para a equipe.")
-    assert disse_que_encaminhou("Encaminhando seu caso, Ana. O número do protocolo é ANA-1.")
+    assert disse_que_encaminhou("Encaminhando seu caso, Ana.")
+    assert disse_que_encaminhou("Encaminhei sim!")
+    assert disse_que_encaminhou("O número do protocolo é ANA-26032026-01.")
     # oferecer encaminhamento não é afirmar que encaminhou
     assert not disse_que_encaminhou("Quer que eu encaminhe para a equipe?")
     assert not disse_que_encaminhou("Posso encaminhar seu caso, se quiser.")
+    # este falso positivo apareceu num teste real e jogou fora uma resposta boa
+    assert not disse_que_encaminhou("Se quiser, posso pedir para que seu caso seja encaminhado à equipe.")
+    assert not disse_que_encaminhou("Você recebe o protocolo e a equipe responde em até 24 horas úteis.")
 
 
 def test_garantir_protocolo():
