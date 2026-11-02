@@ -11,8 +11,10 @@ from agente import (
     Agente,
     disse_que_encaminhou,
     garantir_frete_da_devolucao,
+    garantir_preco_original,
     garantir_protocolo,
     loja_aberta,
+    promocoes_do_resultado,
     proxima_abertura,
 )
 
@@ -148,6 +150,40 @@ def test_garantir_frete_da_devolucao():
 
     # assunto sem relação com desistência: não mexe
     assert garantir_frete_da_devolucao("O Takamine GD20 custa R$ 2.199,00.") == "O Takamine GD20 custa R$ 2.199,00."
+
+
+def test_garantir_preco_original():
+    promocoes = [("R$ 323,10", "R$ 359,00", "10")]
+
+    # mostrou só o preço final: completa com o original e o percentual
+    texto = garantir_preco_original("O Kalani KAL-700T passou a custar R$ 323,10.", promocoes)
+    assert texto == "O Kalani KAL-700T passou a custar R$ 323,10 (de R$ 359,00, 10% de desconto)."
+
+    # já mostrou o original (como no exemplo 2): não mexe
+    completo = "R$ 359,00 com 10% de desconto, R$ 323,10."
+    assert garantir_preco_original(completo, promocoes) == completo
+
+    # sem promoção na busca: não mexe
+    assert garantir_preco_original("Custa R$ 323,10.", []) == "Custa R$ 323,10."
+
+
+def test_promocoes_do_resultado():
+    promocoes = promocoes_do_resultado(ferramentas.buscar_produtos(apenas_promocao=True))
+    assert len(promocoes) == 4
+    assert ("R$ 323,10", "R$ 359,00", "10") in promocoes
+
+    # resultado sem produtos (ex.: busca vazia) não quebra
+    assert promocoes_do_resultado({"mensagem": "Nenhum produto encontrado com esses filtros."}) == []
+
+
+def test_resposta_com_promocao_ganha_o_preco_original(monkeypatch, tmp_path):
+    agente = criar_agente(monkeypatch, tmp_path, [
+        resposta_ferramenta("buscar_produtos", {"apenas_promocao": True}),  # roda de verdade sobre os CSVs
+        resposta_texto("Temos o Kalani KAL-700T por R$ 323,10!"),  # esqueceu o preço original
+    ])
+    texto = agente.responder("Tem alguma promoção?")
+
+    assert "R$ 323,10 (de R$ 359,00, 10% de desconto)" in texto
 
 
 def test_horario_da_loja():

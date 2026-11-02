@@ -145,6 +145,28 @@ def garantir_frete_da_devolucao(texto):
     return texto
 
 
+def promocoes_do_resultado(resultado):
+    """Lista de (preço promocional, preço original, % de desconto) dos produtos em promoção da busca."""
+    promocoes = []
+    produtos = resultado.get("produtos_disponiveis", []) + resultado.get("alternativas_disponiveis", [])
+    for produto in produtos:
+        if "preco_promocional" in produto:
+            desconto = re.search(r"(\d+)%", produto["promocao_ativa"]).group(1)
+            promocoes.append((produto["preco_promocional"], produto["preco"], desconto))
+    return promocoes
+
+
+def garantir_preco_original(texto, promocoes):
+    """Se a resposta mostra o preço promocional sem o original, completa ali mesmo."""
+    # O manual (seção 6.2) manda mostrar sempre o preço original e o percentual junto do preço
+    # promocional. O prompt pede isso, mas testando o modelo às vezes mostrava só o preço final.
+    for preco_promocional, preco_original, desconto in promocoes:
+        if preco_promocional in texto and preco_original not in texto:
+            completo = f"{preco_promocional} (de {preco_original}, {desconto}% de desconto)"
+            texto = texto.replace(preco_promocional, completo, 1)
+    return texto
+
+
 class Agente:
     def __init__(self):
         self.modelo = os.getenv("LLM_MODEL", "emporio-qwen2.5")
@@ -177,6 +199,7 @@ class Agente:
         self.cortar_historico()
         ja_cobrou_ferramenta = False
         protocolo = None  # preenchido se o caso for encaminhado nesta mensagem
+        promocoes = []  # produtos em promoção que a busca devolveu nesta mensagem
         ferramentas_da_vez = FERRAMENTAS
 
         for _ in range(MAX_PASSOS):
@@ -219,6 +242,7 @@ class Agente:
                 # o prompt já pede essas informações, mas o modelo costumava esquecer
                 texto = garantir_protocolo(texto, protocolo)
                 texto = garantir_frete_da_devolucao(texto)
+                texto = garantir_preco_original(texto, promocoes)
 
                 # última checagem: a resposta não pode trazer pedaços do prompt de sistema
                 if seguranca.vazou_prompt(texto):
@@ -251,6 +275,8 @@ class Agente:
                     argumentos = {}
 
                 resultado = executar_ferramenta(nome, argumentos)
+                if nome == "buscar_produtos":
+                    promocoes += promocoes_do_resultado(resultado)
                 if nome == "encaminhar_atendente":
                     protocolo = resultado.get("protocolo")
                     # já encaminhou, então volta a lista completa de ferramentas
