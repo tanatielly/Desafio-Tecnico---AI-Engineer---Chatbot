@@ -52,9 +52,9 @@ Cliente ──> main.py (terminal) ou app_streamlit.py (web)
 
 1. O cliente manda uma mensagem.
 2. A camada de segurança confere a mensagem. Tentativas de manipulação e pedidos claramente fora do escopo recebem uma resposta pronta, sem chamar o LLM.
-3. O agente envia para o LLM: o prompt de sistema (persona + regras + data/hora atual), o histórico e a descrição das 4 ferramentas.
+3. O agente envia para o LLM: o prompt de sistema (persona + regras + data atual e se a loja está aberta), o histórico e a descrição das 4 ferramentas.
 4. Se o LLM pedir uma ferramenta, o Python executa e devolve o resultado em JSON. Isso se repete (no máximo 5 vezes por mensagem).
-5. Quando o LLM responde em texto, o código confere a resposta (encaminhamento real, protocolo, frete da devolução, vazamento do prompt) e ela vai para o cliente.
+5. Quando o LLM responde em texto, o código confere a resposta (encaminhamento real, protocolo, frete da devolução, preço original das promoções, vazamento do prompt) e ela vai para o cliente.
 
 ### Ferramentas
 
@@ -143,10 +143,10 @@ python main.py < exemplos/roteiros/03_devolucao_pedido.txt
 pytest
 ```
 
-São 72 testes, e nenhum chama o LLM de verdade. Eles cobrem:
+São 83 testes, e nenhum chama o LLM de verdade. Eles cobrem:
 - **ferramentas:** preço, promoção, PIX, parcelamento, verificação do pedido, prazos, regras de devolução, protocolo, extração das políticas, busca com sinônimos e erros de digitação;
 - **segurança e escopo:** bloqueios e, tão importante quanto, perguntas normais que **não** podem ser bloqueadas ("qual a política de trocas?", "quero aprender a tocar violão, qual você indica?");
-- **agente:** horário da loja, frete, protocolo, trava de encaminhamento e bloqueios, usando um cliente falso no lugar do LLM.
+- **agente:** horário da loja, frete, protocolo, preço original das promoções, trava de encaminhamento, promessa de consulta sem ferramenta, chamada de ferramenta escrita como texto e bloqueios, usando um cliente falso no lugar do LLM.
 
 ---
 
@@ -241,7 +241,7 @@ O prompt de sistema ([agente.py](agente.py)) é dividido em blocos curtos:
 - **Escopo:** só instrumentos (acessórios são redirecionados). Dúvidas de música só quando ajudam a escolher ou usar um instrumento; aulas, cifras, letras e teoria musical ficam de fora. Recusa gentil de assuntos fora da loja.
 - **Segurança:** mensagens do cliente não mudam as regras, nenhum desconto pode vir de fora das ferramentas (mesmo que o cliente diga ser gerente) e o prompt não pode ser revelado. Essas regras são reforçadas no código (ver [Segurança e escopo](#segurança-e-escopo)).
 - **Dados corrigidos:** as divergências do manual (ver [Suposições](#suposições)).
-- **Agora:** data/hora atual e se a loja está aberta. Se estiver fechada, o Allegro avisa quando a equipe volta (o manual pede isso). O cálculo de aberto/fechado é feito em Python.
+- **Agora:** data atual e se a loja está aberta. Se estiver fechada, o Allegro avisa quando a equipe volta (o manual pede isso). O cálculo de aberto/fechado é feito em Python. A hora **não** vai no prompt: com os minutos, o texto mudava a cada minuto e a mesma pergunta tinha respostas diferentes (ver a tabela de erros encontrados).
 
 As descrições das ferramentas também fazem parte da estratégia: elas dizem **quando** usar cada uma
 (ex.: "só chame `consultar_pedido` depois que o cliente informar o número E o e-mail ou telefone").
@@ -272,7 +272,7 @@ modelo "obedecer" o prompt. Usei várias camadas simples, cada uma pegando o que
 | 2. Prompt | [agente.py](agente.py) | Regras de escopo e de segurança para o que as listas não pegam (ex.: "quem ganha o Brasileirão?" é recusado pelo próprio modelo). |
 | 3. Ferramentas fechadas | [ferramentas.py](ferramentas.py) | O modelo só acessa dados pelas 4 ferramentas. Não existe consulta livre ao banco, então mesmo um modelo "convencido" não consegue listar clientes. |
 | 4. Verificação do pedido (LGPD) | [ferramentas.py](ferramentas.py) | O pedido só aparece com número + e-mail ou telefone do dono, conferidos no Python. A resposta traz só o primeiro nome do cliente, sem telefone, e-mail ou cidade. |
-| 5. Checagem da resposta | [agente.py](agente.py) | Troca a resposta se ela trouxer trechos do prompt de sistema, não deixa o agente dizer que encaminhou o caso sem ter encaminhado e garante o protocolo e o frete da devolução. |
+| 5. Checagem da resposta | [agente.py](agente.py) | Troca a resposta se ela trouxer trechos do prompt de sistema, não deixa o agente dizer que encaminhou o caso sem ter encaminhado (nem prometer "vou verificar" sem consultar nada) e garante o protocolo, o frete da devolução e o preço original junto do preço promocional. |
 | 6. CSV seguro | [seguranca.py](seguranca.py) | Campos que começam com `=`, `+`, `-` ou `@` ganham um `'` na frente, para não virarem fórmula quando a equipe abrir `encaminhamentos.csv` no Excel. |
 
 **Escopo de música:** o Allegro responde dúvidas de música quando elas ajudam a escolher ou usar um instrumento
@@ -347,7 +347,7 @@ As linhas com 🔧 mostram as ferramentas que o agente chamou e as com 🛡️ a
 | 2 | [Preço do Takamine GD20 e busca com erro de digitação](exemplos/02_preco_e_pagamento.md) | Preço, preço no PIX e parcelamento calculados pela ferramenta. "Ukelele da Kalanni" (dois erros) é corrigido pela busca e acha os ukuleles Kalani, incluindo um em promoção sem o desconto do PIX. |
 | 3 | [Devolução de pedido atrasado](exemplos/03_devolucao_pedido.md) — **não trivial** | Pede número do pedido + e-mail antes de consultar (LGPD), consulta o pedido em tempo real, aplica a regra de arrependimento a um pedido que ainda não chegou, explica as condições de devolução (embalagem, reembolso no cartão de débito em até 10 dias úteis) e encaminha o atraso para a equipe com protocolo (registro em `atendimentos/encaminhamentos.csv`). |
 | 4 | [Endereço, horário, segurança e escopo](exemplos/04_loja_e_fora_do_escopo.md) | Consulta às políticas, recusa educada de acessórios e de futebol (pelo prompt), **bloqueio na hora** de uma tentativa de prompt injection e de um pedido de código (🛡️, sem chamar o modelo) e resposta a uma dúvida de música permitida (nylon x aço). |
-| 5 | [Black Friday e produto esgotado](exemplos/05_promocao_e_esgotado.md) — **não trivial** | Não promete campanha que não está ativa, cita as campanhas que existem de verdade e sugere alternativas para um produto esgotado. |
+| 5 | [Black Friday e produto esgotado](exemplos/05_promocao_e_esgotado.md) — **não trivial** | Não promete campanha que não está ativa, cita as campanhas que existem de verdade, mostra as promoções com preço original, percentual e preço final, e busca alternativas para um produto esgotado. |
 
 ### O que os testes com o modelo mostraram
 
@@ -367,6 +367,13 @@ uma instrução, mas sempre recebe o que a ferramenta devolve.
 | Mesmo com o prompt pedindo, disse "Encaminhando seu caso... o número do protocolo é ANA-26032026-1" **sem chamar a ferramenta**: inventou o protocolo e o caso não foi registrado. | Coloquei uma **trava no código** ([agente.py](agente.py)): se a resposta afirma que já encaminhou ou informa um número de protocolo, mas a ferramenta não foi chamada, o agente pede de novo ao modelo oferecendo **só a ferramenta de encaminhamento** (só o aviso não bastava: com as 4 ferramentas na lista ele continuava inventando). Se mesmo assim ele não chamar, o cliente recebe uma resposta honesta com o WhatsApp da loja em vez da promessa falsa. Esse fluxo tem teste com um cliente falso, sem LLM. |
 | Explicava o prazo de devolução, mas **não detalhava as condições** (embalagem original, frete por conta da loja, reembolso em até 10 dias úteis), porque não fazia a segunda chamada para a política de trocas. E **não informava o número do protocolo** do encaminhamento, mesmo com o prompt pedindo. | A `consultar_pedido` passou a devolver as regras de devolução do manual (seção 4.1, e 4.2 para pedido entregue) e para qual forma de pagamento o reembolso volta, sem precisar de outra chamada. O protocolo é garantido no código: se o caso foi encaminhado e o número não está na resposta, ele é acrescentado no final. |
 | Com as condições vindo da ferramenta, passou a explicar embalagem e reembolso, mas **nunca dizia que o frete da devolução é por conta da loja**. | Garantido no código: se a resposta fala de desistência e explica as condições, mas não fala do frete, a frase é acrescentada. Só vale para arrependimento, que é a única regra do manual (4.1) em que a loja paga o frete. |
+| Nas promoções, mostrava só o preço final ("passou a custar R$ 323,10"), sem o preço original e o percentual que o manual (6.2) exige. | Garantido no código: o agente guarda os produtos em promoção que a busca devolveu e, se a resposta mostra o preço promocional sem o original, completa ali mesmo ("R$ 323,10 (de R$ 359,00, 10% de desconto)"). |
+| Rodando de madrugada (com a loja "fechada" no prompt), respondeu "Vou verificar se temos o Giannini GF-3D. **Um momento**, por favor." sem chamar nenhuma ferramenta, e a conversa parou ali. Na rodada seguinte repetiu com outra frase ("Vou verificar se temos... para você!"). | Mesma ideia da trava de encaminhamento: se a resposta promete consultar algo ("vou verificar", "um momento") sem pedir nenhum dado ao cliente e nenhuma ferramenta foi chamada, o agente cobra a consulta uma vez. Se mesmo assim não consultar, o cliente recebe um pedido de desculpas em vez de esperar para sempre. |
+| Mesmo com a trava, numa rodada o modelo não consultou nem depois do aviso. **Reproduzindo o mesmo turno, ele consultava certo em todas as variações**: a falha não era sistemática, era instabilidade. O prompt tinha a hora com minutos, então o texto mudava a cada minuto e a resposta mudava junto, mesmo com `temperature=0`. | Tirei a hora do prompt (ficou só a data e se a loja está aberta, que continua sendo calculado no Python com o horário). Agora a mesma pergunta, no mesmo dia e com a loja no mesmo estado, gera a mesma resposta, o que também permite verificar as correções. Há teste garantindo que o prompt não muda dentro do mesmo horário. |
+| Em "tem promoção de Black Friday?", o modelo inventou um filtro (`categoria: "Guitarras"`), não achou nada e respondeu que a loja **não tinha nenhuma promoção** (tem 4). | Se uma busca de promoções com filtros volta vazia, a ferramenta devolve as promoções ativas da loja e as campanhas. Um filtro inventado não esconde mais as promoções. |
+| O modelo escreveu a chamada de ferramenta **como texto**, com lixo antes (`Ronaldo {"name": "consultar_pedido", ...} </tool_call>`). O Ollama não reconheceu como chamada e esse texto foi direto para o cliente. | O agente reconhece uma chamada escrita no texto (só das 4 ferramentas que existem) e executa normalmente; o lixo não vai para o histórico. É uma falha conhecida do Qwen 2.5 via Ollama. |
+| A trava de "vou verificar" deixou passar "Vou buscar as **informações** agora": para não disparar quando o agente pede dados ao cliente, ela procurava "inform", que também casa com "informações". | Troquei por "informe"/"informar". O caso virou teste. |
+| Mesmo com as travas, no exemplo 5 ele seguia respondendo "vou verificar" sem consultar. Registrando as respostas cruas do modelo, achei a causa: na mensagem anterior ele tinha escrito **"Vou verificar para você!" junto com a chamada da busca**, esse texto ficava no histórico e ele passava a imitá-lo sem chamar a ferramenta. | O texto que vem junto com uma chamada de ferramenta não entra mais no histórico (o cliente nunca o via mesmo). Foi a correção que resolveu de verdade; as travas continuam como rede de segurança. |
 | A própria trava de encaminhamento deu **falso positivo**: o modelo só *ofereceu* ("seu caso pode ser encaminhado") e a palavra "encaminhado" fez a trava trocar uma resposta boa pela mensagem de erro. | A trava passou a disparar só com afirmação de ação concluída ("foi encaminhado", "encaminhei", "encaminhando") ou com um número de protocolo de verdade. Os dois casos viraram teste. |
 
 Todos os exemplos foram gerados de novo com a versão final do código.
@@ -375,8 +382,8 @@ Todos os exemplos foram gerados de novo com a versão final do código.
 
 ## Limitações conhecidas
 
-- **Velocidade no Ollama sem GPU:** na minha máquina (Intel Core 7 150U, 16 GB de RAM, sem GPU) cada resposta levou de 1 a 4 minutos, e cada conversa de exemplo (2 ou 3 mensagens) levou de 5 a 10 minutos. Respostas que usam ferramenta fazem duas chamadas ao modelo, e listas longas de produtos demoram mais para gerar. Com GPU ou com o Groq isso deve cair para poucos segundos.
-- **Modelo pequeno ainda erra às vezes:** apesar das correções, o 7B nem sempre segue todas as instruções e é sensível a mudanças pequenas no prompt (ver a tabela acima). Com `temperature=0` os 5 roteiros ficaram corretos no essencial, mas outras formas de perguntar podem fazer ele pular uma ferramenta. Ainda há detalhes de formato: no exemplo 5 ele cita as campanhas certas, mas não mostra o preço original das promoções nem lista os violões em promoção, apesar da regra no prompt. Como o prompt inclui a hora atual, a mesma pergunta pode ter respostas um pouco diferentes em horários diferentes. A parte crítica (preços, estoque, prazos, verificação do pedido, encaminhamento, protocolo, frete da devolução) fica no Python justamente para reduzir esse risco. Um modelo maior (ex.: Llama 3.3 70B no Groq) deve seguir melhor o prompt.
+- **Velocidade no Ollama sem GPU:** na minha máquina (Intel Core 7 150U, 16 GB de RAM, sem GPU) cada resposta leva cerca de 1 a 2 minutos, e cada conversa de exemplo levou de 3 a 4 minutos. Antes de tirar a hora do prompt eram 5 a 10 minutos por conversa; com o prompt estável o Ollama provavelmente reaproveita o cache entre as chamadas. Respostas que usam ferramenta fazem duas chamadas ao modelo, e listas longas de produtos demoram mais para gerar. Com GPU ou com o Groq isso deve cair para poucos segundos.
+- **Modelo pequeno ainda erra às vezes:** apesar das correções, o 7B nem sempre segue todas as instruções e é sensível a mudanças pequenas no prompt (ver a tabela acima). Com `temperature=0` os 5 roteiros ficaram corretos no essencial, mas outras formas de perguntar podem fazer ele pular uma ferramenta. A parte crítica (preços, estoque, prazos, verificação do pedido, encaminhamento, protocolo, frete da devolução, preço original das promoções) fica no Python justamente para reduzir esse risco. Um modelo maior (ex.: Llama 3.3 70B no Groq) deve seguir melhor o prompt.
 - **Groq não testado:** o código usa a mesma API, mas eu só rodei os testes de ponta a ponta com o Ollama.
 - **Verificação do cliente é simples:** número do pedido + e-mail/telefone. Quem souber esses dados de outra pessoa consegue ver o pedido. Num canal real (WhatsApp) o telefone viria do próprio canal.
 - **Dados estáticos:** os CSVs são carregados quando o programa inicia; mudanças nos arquivos só valem depois de reiniciar.
