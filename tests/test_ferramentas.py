@@ -62,6 +62,49 @@ def test_produto_esgotado_e_descontinuado():
     assert buscar_um("Shelby SN-7C")["situacao"].startswith("descontinuado")
 
 
+def test_busca_corrige_erro_de_digitacao():
+    resultado = ferramentas.buscar_produtos(texto="Takamini GD20")
+    assert [p["nome"] for p in resultado["produtos_disponiveis"]] == ["Takamine GD20 Dreadnought Natural"]
+    assert resultado["busca_entendida_como"] == "takamine gd20"
+
+
+def test_busca_corrige_mais_de_uma_palavra():
+    resultado = ferramentas.buscar_produtos(texto="ukelele kalanni")
+    nomes = [p["nome"] for p in resultado["produtos_disponiveis"]]
+    assert nomes
+    assert all(nome.startswith("Kalani") for nome in nomes)
+
+
+def test_busca_com_sinonimo_em_ingles():
+    resultado = ferramentas.buscar_produtos(texto="guitar fender")
+    nomes = [p["nome"] for p in resultado["produtos_disponiveis"]]
+    assert nomes
+    assert all(nome.startswith("Fender") for nome in nomes)
+
+
+def test_busca_ignora_hifen_no_codigo():
+    # no catálogo o nome é "GF-3D"
+    assert buscar_um("GF3D")["nome"] == "Giannini GF-3D Dreadnought Sunburst"
+
+
+def test_busca_de_acessorio():
+    for texto in ["amplificador", "cordas de guitarra", "jogo de cordas pra violão"]:
+        resultado = ferramentas.buscar_produtos(texto=texto)
+        assert "não vende acessórios" in resultado["mensagem"], texto
+        assert "produtos_disponiveis" not in resultado
+
+
+def test_violao_com_cordas_de_aco_nao_e_acessorio():
+    resultado = ferramentas.buscar_produtos(texto="violão com cordas de aço")
+    assert resultado["total_disponiveis"] > 0
+
+
+def test_busca_nao_inventa_produto_que_nao_existe():
+    # saxofone não tem no catálogo e a correção não pode trocar por outra coisa
+    resultado = ferramentas.buscar_produtos(texto="saxofone")
+    assert resultado["mensagem"].startswith("Nenhum produto")
+
+
 def test_esgotado_ja_traz_alternativas():
     resultado = ferramentas.buscar_produtos(texto="Giannini GF-3D")
     alternativas = resultado["alternativas_disponiveis"]

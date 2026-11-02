@@ -13,10 +13,13 @@ from pathlib import Path
 
 import pandas as pd
 
+import busca
 import dados
 import politicas
 
 PRODUTOS = dados.carregar_produtos()
+TEXTOS_BUSCA = PRODUTOS["texto_busca"].tolist()
+VOCABULARIO = busca.montar_vocabulario(TEXTOS_BUSCA)
 PEDIDOS, ITENS, CLIENTES = dados.carregar_pedidos()
 CATEGORIAS = dados.listar_categorias()
 SECOES_POLITICAS = politicas.carregar_secoes()
@@ -145,12 +148,19 @@ def buscar_produtos(texto=None, categoria=None, preco_maximo=None, apenas_promoc
     if categoria:
         resultado = resultado[resultado["categoria"].apply(dados.normalizar) == dados.normalizar(categoria)]
 
+    correcoes = {}
     if texto:
+        if busca.busca_de_acessorio(texto):
+            return {"mensagem": "A loja não vende acessórios (cordas avulsas, palhetas, cabos, cases, "
+                                "pedais, amplificadores). Trabalhamos só com instrumentos musicais."}
+
+        # troca sinônimos e corrige erros de digitação ("takamini" -> "takamine")
+        termos, correcoes = busca.preparar_termos(texto, TEXTOS_BUSCA, VOCABULARIO)
+
         # cada palavra encontrada vale 1 ponto; ficam só os produtos com mais pontos.
         # Assim "Takamine GD20" traz só o GD20 e não todos os Takamine.
-        palavras = [p for p in dados.normalizar(texto).split() if len(p) > 2]
-        if palavras:
-            pontos = resultado["texto_busca"].apply(lambda t: sum(p in t for p in palavras))
+        if termos:
+            pontos = resultado["texto_busca"].apply(lambda t: sum(p in t for p in termos))
             if pontos.max() > 0:
                 resultado = resultado[pontos == pontos.max()]
             else:
@@ -177,6 +187,9 @@ def buscar_produtos(texto=None, categoria=None, preco_maximo=None, apenas_promoc
         "total_disponiveis": len(disponiveis),
         "produtos_disponiveis": [montar_produto(linha, detalhado) for _, linha in disponiveis.head(LIMITE_RESULTADOS).iterrows()],
     }
+    # avisa o modelo quando a busca corrigiu algo, para ele poder dizer "você quis dizer..."
+    if correcoes:
+        resposta["busca_entendida_como"] = " ".join(termos)
     if len(disponiveis) > LIMITE_RESULTADOS:
         resposta["aviso"] = (
             f"Mostrando só os {LIMITE_RESULTADOS} mais baratos. "

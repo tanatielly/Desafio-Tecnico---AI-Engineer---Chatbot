@@ -57,10 +57,11 @@ def carregar_produtos():
     )
     produtos = produtos.merge(ativas, on="product_id", how="left")
 
-    # coluna auxiliar só para a busca por texto
+    # coluna auxiliar só para a busca por texto.
+    # Sem hífen para "GF3D" e "GF-3D" serem a mesma coisa na busca.
     produtos["texto_busca"] = (
         produtos["name"] + " " + produtos["categoria"] + " " + produtos["description"]
-    ).apply(normalizar)
+    ).apply(normalizar).str.replace("-", "", regex=False)
 
     return produtos
 
