@@ -14,7 +14,7 @@ from agente import (
     garantir_preco_original,
     garantir_protocolo,
     loja_aberta,
-    pediu_para_esperar,
+    prometeu_consultar,
     promocoes_do_resultado,
     proxima_abertura,
 )
@@ -187,12 +187,15 @@ def test_resposta_com_promocao_ganha_o_preco_original(monkeypatch, tmp_path):
     assert "R$ 323,10 (de R$ 359,00, 10% de desconto)" in texto
 
 
-def test_pediu_para_esperar():
-    assert pediu_para_esperar("Vou verificar se temos o Giannini GF-3D em estoque. Um momento, por favor.")
-    assert pediu_para_esperar("Já volto com a resposta!")
-    # pedir dados ao cliente e avisar do retorno da equipe são normais
-    assert not pediu_para_esperar("Vou verificar seu pedido. Por favor, me informe o número do pedido.")
-    assert not pediu_para_esperar("Aguarde o contato da equipe em até 24 horas úteis.")
+def test_prometeu_consultar():
+    # as duas frases apareceram em testes reais, sem nenhuma ferramenta chamada
+    assert prometeu_consultar("Vou verificar se temos o Giannini GF-3D em estoque. Um momento, por favor.")
+    assert prometeu_consultar("Vou verificar se temos o Giannini GF-3D em estoque para você!")
+    assert prometeu_consultar("Já volto com a resposta!")
+    # pedir dados ao cliente antes de consultar e avisar do retorno da equipe são normais
+    assert not prometeu_consultar("Vou verificar seu pedido. Por favor, me informe o número do pedido.")
+    assert not prometeu_consultar("Vou verificar, qual é o número do pedido?")
+    assert not prometeu_consultar("Aguarde o contato da equipe em até 24 horas úteis.")
 
 
 def test_resposta_de_espera_vira_consulta_de_verdade(monkeypatch, tmp_path):

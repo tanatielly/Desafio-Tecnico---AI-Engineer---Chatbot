@@ -126,12 +126,19 @@ def disse_que_encaminhou(texto):
     return bool(re.search(padrao, texto.lower()))
 
 
-def pediu_para_esperar(texto):
-    """True se a resposta pede para o cliente esperar ("um momento", "já volto")."""
-    # Num chat não existe "esperar": se o modelo pediu um momento sem chamar ferramenta,
-    # a conversa trava. Só frases de espera contam; "vou verificar, me informe o pedido" é normal.
-    padrao = r"um momento|um instante|s[oó] um minuto|aguarde (um|s[oó])|j[aá] volto"
-    return bool(re.search(padrao, texto.lower()))
+def prometeu_consultar(texto):
+    """True se a resposta promete consultar algo ("vou verificar", "um momento") sem pedir nada ao cliente."""
+    # Num chat não existe "esperar": se o modelo promete consultar e não chama ferramenta,
+    # a conversa trava. Mas "vou verificar seu pedido, me informe o número" é normal, porque
+    # ele está pedindo dados ao cliente antes de consultar.
+    texto = texto.lower()
+    promete = re.search(
+        r"um momento|um instante|s[oó] um minuto|aguarde (um|s[oó])|j[aá] volto"
+        r"|vou (verificar|consultar|checar|conferir|olhar|ver se)|deixa eu (ver|verificar|olhar)",
+        texto,
+    )
+    pede_dados = "?" in texto or re.search(r"inform|me passa|me diga|preciso d", texto)
+    return bool(promete) and not pede_dados
 
 
 def garantir_protocolo(texto, protocolo):
@@ -229,12 +236,12 @@ class Agente:
 
                 # Testando, o modelo respondeu "vou verificar, um momento" sem chamar nenhuma
                 # ferramenta, e a conversa parou ali. Peço uma vez para ele consultar de verdade.
-                if pediu_para_esperar(texto) and not self.ultimas_ferramentas:
+                if prometeu_consultar(texto) and not self.ultimas_ferramentas:
                     if not ja_cobrou_consulta:
                         ja_cobrou_consulta = True
                         self.historico.append({
                             "role": "user",
-                            "content": "[aviso do sistema] Você pediu para o cliente esperar, mas não consultou "
+                            "content": "[aviso do sistema] Você disse que ia verificar, mas não consultou "
                                        "nada. Chame agora a ferramenta certa e responda com o resultado.",
                         })
                         continue
