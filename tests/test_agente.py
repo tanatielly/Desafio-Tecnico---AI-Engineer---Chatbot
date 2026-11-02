@@ -225,6 +225,16 @@ def test_chamada_escrita_no_texto_e_executada(monkeypatch, tmp_path):
     assert "Ronaldo" not in str(agente.historico)  # o lixo não vai para o histórico
 
 
+def test_texto_junto_da_chamada_nao_vai_para_o_historico(monkeypatch, tmp_path):
+    chamada = resposta_ferramenta("buscar_produtos", {"apenas_promocao": True})
+    chamada.content = "Vou verificar para você! "  # o modelo escreveu isso junto com a chamada
+    agente = criar_agente(monkeypatch, tmp_path, [chamada, resposta_texto("Temos 4 promoções ativas.")])
+    agente.responder("Tem promoção?")
+
+    mensagem_da_chamada = [m for m in agente.historico if m.get("tool_calls")][0]
+    assert mensagem_da_chamada["content"] == ""
+
+
 def test_resposta_de_espera_vira_consulta_de_verdade(monkeypatch, tmp_path):
     agente = criar_agente(monkeypatch, tmp_path, [
         resposta_texto("Vou verificar se temos em estoque. Um momento, por favor."),  # não consultou

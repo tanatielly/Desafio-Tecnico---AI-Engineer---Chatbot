@@ -265,7 +265,6 @@ class Agente:
                 if escrita:
                     nome, argumentos = escrita
                     chamadas = [("chamada_no_texto", nome, json.dumps(argumentos, ensure_ascii=False))]
-                    conteudo = ""  # o texto era só a chamada (com lixo), não vai para o histórico
 
             # sem chamada de ferramenta = o modelo já respondeu o cliente
             if not chamadas:
@@ -320,9 +319,12 @@ class Agente:
                 self.transcricao.append(("Allegro", texto))
                 return texto
 
+            # O texto que vem junto com a chamada ("Vou verificar para você!") não entra no histórico.
+            # Testando, o modelo imitava esse texto nas mensagens seguintes e esquecia de chamar
+            # a ferramenta. O cliente também nunca vê esse texto.
             self.historico.append({
                 "role": "assistant",
-                "content": conteudo,
+                "content": "",
                 "tool_calls": [
                     {"id": id_chamada, "type": "function", "function": {"name": nome, "arguments": argumentos_texto}}
                     for id_chamada, nome, argumentos_texto in chamadas
