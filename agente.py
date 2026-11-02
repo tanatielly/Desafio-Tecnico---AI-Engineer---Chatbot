@@ -166,7 +166,11 @@ def garantir_frete_da_devolucao(texto):
 def promocoes_do_resultado(resultado):
     """Lista de (preço promocional, preço original, % de desconto) dos produtos em promoção da busca."""
     promocoes = []
-    produtos = resultado.get("produtos_disponiveis", []) + resultado.get("alternativas_disponiveis", [])
+    produtos = (
+        resultado.get("produtos_disponiveis", [])
+        + resultado.get("alternativas_disponiveis", [])
+        + resultado.get("promocoes_ativas_na_loja", [])
+    )
     for produto in produtos:
         if "preco_promocional" in produto:
             desconto = re.search(r"(\d+)%", produto["promocao_ativa"]).group(1)

@@ -175,7 +175,17 @@ def buscar_produtos(texto=None, categoria=None, preco_maximo=None, apenas_promoc
         resultado = resultado[resultado["desconto"].notna()]
 
     if resultado.empty:
-        return {"mensagem": "Nenhum produto encontrado com esses filtros."}
+        resposta = {"mensagem": "Nenhum produto encontrado com esses filtros."}
+        # Testando "tem promoção de Black Friday?", o modelo inventou um filtro de categoria,
+        # não achou nada e disse que a loja não tinha nenhuma promoção (tem 4). Se a busca era
+        # de promoções, mostro as que existem na loja.
+        if str(apenas_promocao).lower() == "true" and (texto or categoria or preco_maximo):
+            todas = buscar_produtos(apenas_promocao=True)
+            resposta["mensagem"] = "Nenhuma promoção com esses filtros, mas existem promoções ativas em outros produtos."
+            resposta["promocoes_ativas_na_loja"] = todas["produtos_disponiveis"]
+            resposta["campanhas_ativas"] = todas["campanhas_ativas"]
+            resposta["aviso_campanhas"] = todas["aviso_campanhas"]
+        return resposta
 
     # Separo disponíveis e indisponíveis em listas diferentes. Quando vinha tudo junto,
     # o modelo às vezes oferecia produto esgotado como se estivesse disponível.

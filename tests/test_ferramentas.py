@@ -121,6 +121,14 @@ def test_promocoes_mostram_campanhas_ativas():
     assert "Black Friday" not in resultado["campanhas_ativas"]
 
 
+def test_promocao_com_filtro_inventado_mostra_as_que_existem():
+    # o modelo chegou a mandar categoria="Guitarras" e texto="Black Friday" numa pergunta geral
+    for filtros in [{"categoria": "Guitarras"}, {"texto": "Black Friday"}]:
+        resultado = ferramentas.buscar_produtos(apenas_promocao=True, **filtros)
+        assert len(resultado["promocoes_ativas_na_loja"]) == 4, filtros
+        assert resultado["campanhas_ativas"] == ["Desconto Exclusivo", "Oferta Especial"]
+
+
 def test_descricao_errada_nao_e_enviada():
     # a descrição do "Music Man Bass 1X" fala de um Fender Jazz Bass, então ela é removida
     assert "descricao" not in buscar_um("Music Man Bass 1X")
