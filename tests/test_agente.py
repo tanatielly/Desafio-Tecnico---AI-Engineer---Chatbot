@@ -14,6 +14,7 @@ from agente import (
     garantir_preco_original,
     garantir_protocolo,
     loja_aberta,
+    pediu_para_esperar,
     promocoes_do_resultado,
     proxima_abertura,
 )
@@ -184,6 +185,36 @@ def test_resposta_com_promocao_ganha_o_preco_original(monkeypatch, tmp_path):
     texto = agente.responder("Tem alguma promoção?")
 
     assert "R$ 323,10 (de R$ 359,00, 10% de desconto)" in texto
+
+
+def test_pediu_para_esperar():
+    assert pediu_para_esperar("Vou verificar se temos o Giannini GF-3D em estoque. Um momento, por favor.")
+    assert pediu_para_esperar("Já volto com a resposta!")
+    # pedir dados ao cliente e avisar do retorno da equipe são normais
+    assert not pediu_para_esperar("Vou verificar seu pedido. Por favor, me informe o número do pedido.")
+    assert not pediu_para_esperar("Aguarde o contato da equipe em até 24 horas úteis.")
+
+
+def test_resposta_de_espera_vira_consulta_de_verdade(monkeypatch, tmp_path):
+    agente = criar_agente(monkeypatch, tmp_path, [
+        resposta_texto("Vou verificar se temos em estoque. Um momento, por favor."),  # não consultou
+        resposta_ferramenta("buscar_produtos", {"texto": "Giannini GF-3D"}),
+        resposta_texto("O Giannini GF-3D está esgotado no momento."),
+    ])
+    texto = agente.responder("Quero o violão Giannini GF-3D, ainda tem?")
+
+    assert agente.ultimas_ferramentas == ['buscar_produtos({"texto": "Giannini GF-3D"})']
+    assert texto == "O Giannini GF-3D está esgotado no momento."
+
+
+def test_espera_sem_consulta_nao_trava_a_conversa(monkeypatch, tmp_path):
+    agente = criar_agente(monkeypatch, tmp_path, [
+        resposta_texto("Um momento, por favor."),
+        resposta_texto("Só um instante, já volto!"),  # mesmo depois do aviso não consultou
+    ])
+    texto = agente.responder("Quero o violão Giannini GF-3D, ainda tem?")
+
+    assert "não consegui consultar" in texto
 
 
 def test_horario_da_loja():

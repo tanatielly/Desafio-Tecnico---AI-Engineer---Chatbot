@@ -126,6 +126,14 @@ def disse_que_encaminhou(texto):
     return bool(re.search(padrao, texto.lower()))
 
 
+def pediu_para_esperar(texto):
+    """True se a resposta pede para o cliente esperar ("um momento", "já volto")."""
+    # Num chat não existe "esperar": se o modelo pediu um momento sem chamar ferramenta,
+    # a conversa trava. Só frases de espera contam; "vou verificar, me informe o pedido" é normal.
+    padrao = r"um momento|um instante|s[oó] um minuto|aguarde (um|s[oó])|j[aá] volto"
+    return bool(re.search(padrao, texto.lower()))
+
+
 def garantir_protocolo(texto, protocolo):
     """Se teve encaminhamento e o modelo esqueceu de citar o protocolo, coloco no final da resposta."""
     if protocolo and protocolo not in texto:
@@ -198,6 +206,7 @@ class Agente:
         self.historico.append({"role": "user", "content": mensagem})
         self.cortar_historico()
         ja_cobrou_ferramenta = False
+        ja_cobrou_consulta = False
         protocolo = None  # preenchido se o caso for encaminhado nesta mensagem
         promocoes = []  # produtos em promoção que a busca devolveu nesta mensagem
         ferramentas_da_vez = FERRAMENTAS
@@ -217,6 +226,19 @@ class Agente:
             # sem chamada de ferramenta = o modelo já respondeu o cliente
             if not msg.tool_calls:
                 texto = (msg.content or "").strip()
+
+                # Testando, o modelo respondeu "vou verificar, um momento" sem chamar nenhuma
+                # ferramenta, e a conversa parou ali. Peço uma vez para ele consultar de verdade.
+                if pediu_para_esperar(texto) and not self.ultimas_ferramentas:
+                    if not ja_cobrou_consulta:
+                        ja_cobrou_consulta = True
+                        self.historico.append({
+                            "role": "user",
+                            "content": "[aviso do sistema] Você pediu para o cliente esperar, mas não consultou "
+                                       "nada. Chame agora a ferramenta certa e responda com o resultado.",
+                        })
+                        continue
+                    texto = "Desculpa, não consegui consultar isso agora 😕 Pode repetir a pergunta?"
 
                 # Trava de segurança: nos testes o modelo disse que tinha encaminhado o caso
                 # (e até inventou um protocolo) sem chamar a ferramenta. Se isso acontecer,
