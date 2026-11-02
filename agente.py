@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 import seguranca
-from ferramentas import FERRAMENTAS, executar_ferramenta, hoje
+from ferramentas import FERRAMENTAS, FUNCOES, executar_ferramenta, hoje
 
 load_dotenv()
 
@@ -140,8 +140,26 @@ def prometeu_consultar(texto):
         r"|vou (verificar|consultar|checar|conferir|olhar|ver se)|deixa eu (ver|verificar|olhar)",
         texto,
     )
-    pede_dados = "?" in texto or re.search(r"inform|me passa|me diga|preciso d", texto)
+    # cuidado: "inform" sozinho também pegava "informações" ("vou buscar as informações agora")
+    pede_dados = "?" in texto or re.search(r"\binforme\b|\binformar\b|me passa|me diga|preciso d", texto)
     return bool(promete) and not pede_dados
+
+
+def chamada_escrita_no_texto(texto):
+    """Se o modelo escreveu a chamada de ferramenta como texto, devolve (nome, argumentos). Senão, None."""
+    inicio = re.search(r'\{\s*"name"\s*:', texto)
+    if not inicio:
+        return None
+    try:
+        chamada, _ = json.JSONDecoder().raw_decode(texto[inicio.start():])
+    except json.JSONDecodeError:
+        return None
+    nome = chamada.get("name")
+    argumentos = chamada.get("arguments", {})
+    # só aceito as ferramentas que existem, para um texto qualquer com "name" não virar chamada
+    if nome not in FUNCOES or not isinstance(argumentos, dict):
+        return None
+    return nome, argumentos
 
 
 def garantir_protocolo(texto, protocolo):
@@ -236,10 +254,22 @@ class Agente:
                 temperature=0,
             )
             msg = resposta.choices[0].message
+            chamadas = [(c.id, c.function.name, c.function.arguments) for c in (msg.tool_calls or [])]
+            conteudo = msg.content or ""
+
+            # Às vezes o Qwen escreve a chamada de ferramenta como texto, com lixo antes
+            # (ex: 'Ronaldo {"name": "consultar_pedido", ...} </tool_call>'), e o Ollama não reconhece.
+            # Testando, isso foi direto para o cliente. Se acontecer, executo a chamada mesmo assim.
+            if not chamadas:
+                escrita = chamada_escrita_no_texto(conteudo)
+                if escrita:
+                    nome, argumentos = escrita
+                    chamadas = [("chamada_no_texto", nome, json.dumps(argumentos, ensure_ascii=False))]
+                    conteudo = ""  # o texto era só a chamada (com lixo), não vai para o histórico
 
             # sem chamada de ferramenta = o modelo já respondeu o cliente
-            if not msg.tool_calls:
-                texto = (msg.content or "").strip()
+            if not chamadas:
+                texto = conteudo.strip()
 
                 # Testando, o modelo respondeu "vou verificar, um momento" sem chamar nenhuma
                 # ferramenta, e a conversa parou ali. Peço uma vez para ele consultar de verdade.
@@ -292,21 +322,16 @@ class Agente:
 
             self.historico.append({
                 "role": "assistant",
-                "content": msg.content or "",
+                "content": conteudo,
                 "tool_calls": [
-                    {
-                        "id": chamada.id,
-                        "type": "function",
-                        "function": {"name": chamada.function.name, "arguments": chamada.function.arguments},
-                    }
-                    for chamada in msg.tool_calls
+                    {"id": id_chamada, "type": "function", "function": {"name": nome, "arguments": argumentos_texto}}
+                    for id_chamada, nome, argumentos_texto in chamadas
                 ],
             })
 
-            for chamada in msg.tool_calls:
-                nome = chamada.function.name
+            for id_chamada, nome, argumentos_texto in chamadas:
                 try:
-                    argumentos = json.loads(chamada.function.arguments or "{}")
+                    argumentos = json.loads(argumentos_texto or "{}")
                 except json.JSONDecodeError:
                     argumentos = {}
 
@@ -324,7 +349,7 @@ class Agente:
 
                 self.historico.append({
                     "role": "tool",
-                    "tool_call_id": chamada.id,
+                    "tool_call_id": id_chamada,
                     "content": json.dumps(resultado, ensure_ascii=False),
                 })
 

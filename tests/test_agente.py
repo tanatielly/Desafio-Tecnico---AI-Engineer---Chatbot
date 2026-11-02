@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import ferramentas
 from agente import (
     Agente,
+    chamada_escrita_no_texto,
     disse_que_encaminhou,
     garantir_frete_da_devolucao,
     garantir_preco_original,
@@ -192,10 +193,36 @@ def test_prometeu_consultar():
     assert prometeu_consultar("Vou verificar se temos o Giannini GF-3D em estoque. Um momento, por favor.")
     assert prometeu_consultar("Vou verificar se temos o Giannini GF-3D em estoque para você!")
     assert prometeu_consultar("Já volto com a resposta!")
+    # "informações" não é pedir dados ao cliente (bug que deixou essa passar num teste real)
+    assert prometeu_consultar("Claro, vou verificar o estoque do Giannini GF-3D!\n\nVou buscar as informações agora.")
     # pedir dados ao cliente antes de consultar e avisar do retorno da equipe são normais
     assert not prometeu_consultar("Vou verificar seu pedido. Por favor, me informe o número do pedido.")
     assert not prometeu_consultar("Vou verificar, qual é o número do pedido?")
     assert not prometeu_consultar("Aguarde o contato da equipe em até 24 horas úteis.")
+
+
+def test_chamada_escrita_no_texto():
+    # texto real de um teste: o modelo escreveu a chamada como texto, com lixo antes
+    texto = ('Ronaldo\n{"name": "consultar_pedido", "arguments": {"email_ou_telefone": '
+             '"anacarol.ferreira@coldmail.com", "numero_pedido": 8}}\n</tool_call>')
+    assert chamada_escrita_no_texto(texto) == (
+        "consultar_pedido", {"email_ou_telefone": "anacarol.ferreira@coldmail.com", "numero_pedido": 8}
+    )
+    # texto normal e ferramenta que não existe não viram chamada
+    assert chamada_escrita_no_texto("O Takamine GD20 custa R$ 2.199,00.") is None
+    assert chamada_escrita_no_texto('{"name": "apagar_tudo", "arguments": {}}') is None
+
+
+def test_chamada_escrita_no_texto_e_executada(monkeypatch, tmp_path):
+    agente = criar_agente(monkeypatch, tmp_path, [
+        resposta_texto('Ronaldo\n{"name": "buscar_produtos", "arguments": {"texto": "Takamine GD20"}}\n</tool_call>'),
+        resposta_texto("O Takamine GD20 custa R$ 2.199,00."),
+    ])
+    texto = agente.responder("Quanto custa o Takamine GD20?")
+
+    assert agente.ultimas_ferramentas == ['buscar_produtos({"texto": "Takamine GD20"})']
+    assert texto == "O Takamine GD20 custa R$ 2.199,00."
+    assert "Ronaldo" not in str(agente.historico)  # o lixo não vai para o histórico
 
 
 def test_resposta_de_espera_vira_consulta_de_verdade(monkeypatch, tmp_path):
