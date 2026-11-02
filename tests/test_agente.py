@@ -7,7 +7,14 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import ferramentas
-from agente import Agente, disse_que_encaminhou, garantir_protocolo, loja_aberta, proxima_abertura
+from agente import (
+    Agente,
+    disse_que_encaminhou,
+    garantir_frete_da_devolucao,
+    garantir_protocolo,
+    loja_aberta,
+    proxima_abertura,
+)
 
 
 class ClienteFalso:
@@ -89,6 +96,22 @@ def test_garantir_protocolo():
 
     # sem encaminhamento nesta mensagem: não muda nada
     assert garantir_protocolo("Oi, tudo bem?", None) == "Oi, tudo bem?"
+
+
+def test_garantir_frete_da_devolucao():
+    explicacao = ("Você pode desistir da compra em até 7 dias após receber. "
+                  "O reembolso volta no cartão de débito em até 10 dias úteis.")
+
+    # explicou a desistência sem falar do frete: acrescenta
+    texto = garantir_frete_da_devolucao(explicacao)
+    assert texto.endswith("E o frete da devolução fica por conta da loja 📦")
+
+    # já falou do frete: não repete
+    com_frete = explicacao + " O frete de devolução é por conta da loja."
+    assert garantir_frete_da_devolucao(com_frete) == com_frete
+
+    # assunto sem relação com desistência: não mexe
+    assert garantir_frete_da_devolucao("O Takamine GD20 custa R$ 2.199,00.") == "O Takamine GD20 custa R$ 2.199,00."
 
 
 def test_horario_da_loja():

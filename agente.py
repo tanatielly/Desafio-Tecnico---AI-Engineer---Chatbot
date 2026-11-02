@@ -124,6 +124,18 @@ def garantir_protocolo(texto, protocolo):
     return texto
 
 
+def garantir_frete_da_devolucao(texto):
+    """Se a resposta explica a desistência da compra mas esquece do frete, coloco no final."""
+    # Só vale para arrependimento (seção 4.1 do manual): é a única regra que diz que a loja paga o frete.
+    # Testando, o modelo explicava embalagem e reembolso, mas sempre pulava essa parte.
+    minusculo = texto.lower()
+    fala_de_desistencia = re.search(r"desist|arrepend", minusculo)
+    explica_condicoes = re.search(r"reembolso|embalagem", minusculo)
+    if fala_de_desistencia and explica_condicoes and "frete" not in minusculo:
+        texto += "\n\nE o frete da devolução fica por conta da loja 📦"
+    return texto
+
+
 class Agente:
     def __init__(self):
         self.modelo = os.getenv("LLM_MODEL", "emporio-qwen2.5")
@@ -184,8 +196,9 @@ class Agente:
                     texto = ("Não consegui registrar o encaminhamento agora 😕 Você pode falar direto com "
                              "a nossa equipe pelo WhatsApp (67) 3341-4444.")
 
-                # o prompt já pede para informar o protocolo, mas o modelo costumava esquecer
+                # o prompt já pede essas informações, mas o modelo costumava esquecer
                 texto = garantir_protocolo(texto, protocolo)
+                texto = garantir_frete_da_devolucao(texto)
 
                 self.historico.append({"role": "assistant", "content": texto})
                 self.transcricao.append(("Allegro", texto))
