@@ -68,7 +68,7 @@ DADOS CORRIGIDOS (o manual tem divergências, use estes)
 - Cartão de crédito sem juros: até 3x com parcela mínima de R$ 50; de 4x a 6x com parcela mínima de R$ 80; de 7x a 12x com parcela mínima de R$ 100.
 
 AGORA
-- Data e hora: {data_hora} ({dia_semana}).
+- Data: {data} ({dia_semana}).
 - {situacao_loja}
 """
 
@@ -111,7 +111,10 @@ def montar_prompt():
         )
 
     return PROMPT_SISTEMA.format(
-        data_hora=momento.strftime("%d/%m/%Y %H:%M"),
+        # Só a data, sem a hora: com os minutos no prompt o texto mudava a cada minuto e a
+        # mesma pergunta tinha respostas diferentes (às vezes o modelo nem chamava a ferramenta).
+        # O horário continua sendo usado acima para saber se a loja está aberta.
+        data=momento.strftime("%d/%m/%Y"),
         dia_semana=DIAS_SEMANA[momento.weekday()],
         situacao_loja=situacao,
     )

@@ -220,6 +220,21 @@ def test_espera_sem_consulta_nao_trava_a_conversa(monkeypatch, tmp_path):
     assert "não consegui consultar" in texto
 
 
+def test_prompt_nao_muda_a_cada_minuto(monkeypatch):
+    import agente
+
+    monkeypatch.setattr(agente, "agora", lambda: datetime(2026, 3, 25, 10, 0))
+    prompt_10h = agente.montar_prompt()
+    monkeypatch.setattr(agente, "agora", lambda: datetime(2026, 3, 25, 10, 37))
+    prompt_10h37 = agente.montar_prompt()
+    # mesmo dia e loja aberta nos dois horários: o prompt tem que ser igual
+    assert prompt_10h == prompt_10h37
+
+    # mas muda quando a loja fecha
+    monkeypatch.setattr(agente, "agora", lambda: datetime(2026, 3, 25, 19, 0))
+    assert agente.montar_prompt() != prompt_10h
+
+
 def test_horario_da_loja():
     assert loja_aberta(datetime(2026, 3, 25, 10, 0))      # quarta, 10h
     assert not loja_aberta(datetime(2026, 3, 25, 19, 0))  # quarta, 19h
