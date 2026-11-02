@@ -16,6 +16,7 @@ import pandas as pd
 import busca
 import dados
 import politicas
+import seguranca
 
 PRODUTOS = dados.carregar_produtos()
 TEXTOS_BUSCA = PRODUTOS["texto_busca"].tolist()
@@ -340,7 +341,14 @@ def encaminhar_atendente(motivo, nome="", contato=""):
         escritor = csv.writer(f)
         if arquivo_novo:
             escritor.writerow(["protocolo", "data_hora", "nome", "contato", "motivo"])
-        escritor.writerow([protocolo, datetime.now().isoformat(timespec="seconds"), nome, contato, motivo])
+        # os campos vêm do cliente (via modelo), então limpo para não virarem fórmula no Excel
+        escritor.writerow([
+            protocolo,
+            datetime.now().isoformat(timespec="seconds"),
+            seguranca.limpar_campo_csv(nome),
+            seguranca.limpar_campo_csv(contato),
+            seguranca.limpar_campo_csv(motivo),
+        ])
 
     return {
         "protocolo": protocolo,

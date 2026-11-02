@@ -57,6 +57,8 @@ def main():
 
         for chamada in agente.ultimas_ferramentas:
             print(f"  [ferramenta] {chamada}")
+        if agente.ultimo_bloqueio:
+            print(f"  [segurança] bloqueado: {agente.ultimo_bloqueio}")
         print(f"\nAllegro: {resposta}")
 
     arquivo = agente.salvar_conversa()

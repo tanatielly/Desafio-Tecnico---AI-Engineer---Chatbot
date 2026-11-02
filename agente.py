@@ -14,6 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
+import seguranca
 from ferramentas import FERRAMENTAS, executar_ferramenta, hoje
 
 load_dotenv()
@@ -149,11 +150,22 @@ class Agente:
         self.transcricao = []
         # ferramentas chamadas na última resposta (a interface mostra isso para quem está testando)
         self.ultimas_ferramentas = []
+        # motivo, se a última mensagem foi barrada pela camada de segurança
+        self.ultimo_bloqueio = None
 
     def responder(self, mensagem):
-        self.historico.append({"role": "user", "content": mensagem})
         self.transcricao.append(("Cliente", mensagem))
         self.ultimas_ferramentas = []
+        self.ultimo_bloqueio = None
+
+        # Casos claros de manipulação ou fora do escopo são respondidos aqui mesmo, sem chamar
+        # o modelo: é mais seguro e a resposta sai na hora. A mensagem barrada não entra no
+        # histórico, para o texto de manipulação não chegar ao modelo nas próximas mensagens.
+        motivo, resposta_pronta = seguranca.verificar_mensagem(mensagem)
+        if motivo:
+            return self.responder_bloqueio(motivo, resposta_pronta)
+
+        self.historico.append({"role": "user", "content": mensagem})
         self.cortar_historico()
         ja_cobrou_ferramenta = False
         protocolo = None  # preenchido se o caso for encaminhado nesta mensagem
@@ -200,6 +212,12 @@ class Agente:
                 texto = garantir_protocolo(texto, protocolo)
                 texto = garantir_frete_da_devolucao(texto)
 
+                # última checagem: a resposta não pode trazer pedaços do prompt de sistema
+                if seguranca.vazou_prompt(texto):
+                    self.historico.append({"role": "assistant", "content": seguranca.RESPOSTA_MANIPULACAO})
+                    return self.responder_bloqueio("resposta parecia vazar as instruções internas",
+                                                   seguranca.RESPOSTA_MANIPULACAO)
+
                 self.historico.append({"role": "assistant", "content": texto})
                 self.transcricao.append(("Allegro", texto))
                 return texto
@@ -245,6 +263,13 @@ class Agente:
         self.transcricao.append(("Allegro", texto))
         return texto
 
+    def responder_bloqueio(self, motivo, resposta):
+        """Resposta pronta da camada de segurança. Fica registrada na transcrição para a equipe ver."""
+        self.ultimo_bloqueio = motivo
+        self.transcricao.append(("seguranca", f"bloqueado: {motivo}"))
+        self.transcricao.append(("Allegro", resposta))
+        return resposta
+
     def cortar_historico(self):
         # Joga fora as mensagens mais antigas. O histórico sempre recomeça numa mensagem do
         # cliente, para não separar uma chamada de ferramenta do resultado dela.
@@ -257,6 +282,7 @@ class Agente:
         self.historico = []
         self.transcricao = []
         self.ultimas_ferramentas = []
+        self.ultimo_bloqueio = None
 
     def salvar_conversa(self, arquivo=None):
         """Salva a conversa em markdown na pasta conversas/ e devolve o caminho do arquivo."""
@@ -271,6 +297,8 @@ class Agente:
         for papel, texto in self.transcricao:
             if papel == "ferramenta":
                 linhas.append(f"> 🔧 `{texto}`")
+            elif papel == "seguranca":
+                linhas.append(f"> 🛡️ {texto}")
             else:
                 linhas.append(f"**{papel}:** {texto}")
             linhas.append("")
